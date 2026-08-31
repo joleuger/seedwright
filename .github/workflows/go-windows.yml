@@ -1,0 +1,33 @@
+name: Build seedwright for Windows
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: "go.mod"
+
+      - name: Build
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          mkdir -p dist
+          go build -v -o dist/seedwright.exe ./cmd/app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: seedwright-windows-amd64
+          path: dist/seedwright.exe
