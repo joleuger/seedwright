@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Project }} — Settings — {{ .Title }}</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <style>
+        /* ---- Reset + base ---- */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #0a0e1a;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        a { color: #64ffda; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* ---- Layout ---- */
+        .settings-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ---- Sidebar ---- */
+        .settings-sidebar {
+            width: 220px;
+            min-width: 220px;
+            background: #0d1b36;
+            border-right: 1px solid #1a2a4a;
+            padding: 1.5rem 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-header {
+            padding: 0 1.25rem 1rem;
+            border-bottom: 1px solid #1a2a4a;
+            margin-bottom: 0.75rem;
+        }
+        .sidebar-header h2 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6a7a9a;
+            font-weight: 600;
+        }
+        .sidebar-back {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1.25rem;
+            margin-bottom: 0.5rem;
+            color: #8a9aba;
+            font-size: 0.85rem;
+        }
+        .sidebar-back:hover { color: #e0e0e0; text-decoration: none; }
+        .sidebar-nav { list-style: none; flex: 1; }
+        .sidebar-nav li a {
+            display: block;
+            padding: 0.6rem 1.25rem;
+            color: #8a9aba;
+            font-size: 0.9rem;
+            border-left: 3px solid transparent;
+            transition: all 0.15s;
+        }
+        .sidebar-nav li a:hover {
+            color: #e0e0e0;
+            background: rgba(100, 255, 218, 0.04);
+        }
+        .sidebar-nav li.active a {
+            color: #64ffda;
+            background: rgba(100, 255, 218, 0.08);
+            border-left-color: #64ffda;
+        }
+
+        /* ---- Sidebar danger zone ---- */
+        .sidebar-danger {
+            padding: 0 1.25rem 1.5rem;
+            border-top: 1px solid #1a2a4a;
+            margin-top: auto;
+        }
+        .sidebar-danger-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #8b0000;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .sidebar-danger .btn-delete {
+            display: block;
+            width: 100%;
+            padding: 0.5rem;
+            background: transparent;
+            border: 1px solid #8b0000;
+            color: #ff6b6b;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .sidebar-danger .btn-delete:hover {
+            background: #8b0000;
+            color: #fff;
+        }
+
+        .sidebar-dirty::after {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: #ff6b6b;
+            border-radius: 50%;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
+        /* ---- Content area ---- */
+        .settings-content {
+            flex: 1;
+            padding: 2rem 3rem;
+            max-width: 720px;
+            overflow-y: auto;
+        }
+        .settings-content-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #1a2a4a;
+        }
+        .settings-content-header h1 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            color: #e0e0e0;
+        }
+        .settings-content-header .btn {
+            font-size: 0.85rem;
+            padding: 0.5rem 1.25rem;
+            border-radius: 6px;
+            border: 1px solid #0f3460;
+            background: #0d1b36;
+            color: #e0e0e0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .settings-content-header .btn:hover {
+            background: #1a2a4a;
+        }
+        .settings-content-header .btn-primary {
+            background: #0f3460;
+            border-color: #1a4a80;
+        }
+        .settings-content-header .btn-primary:hover {
+            background: #1a4a80;
+        }
+        .settings-content-header .btn-primary.dirty {
+            background: #8b0000;
+            border-color: #a02020;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* ---- Form ---- */
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: #a0b0d0;
+            margin-bottom: 0.4rem;
+            font-weight: 500;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="number"],
+        .form-group input[type="url"],
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            background: #0d1b36;
+            border: 1px solid #0f3460;
+            color: #e0e0e0;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #64ffda;
+        }
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        .form-group .help-text {
+            font-size: 0.75rem;
+            color: #6a7a9a;
+            margin-top: 0.35rem;
+            line-height: 1.4;
+        }
+        .form-group .help-text code {
+            background: #0d1b36;
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+        }
+
+        /* ---- Switch (checkbox) ---- */
+        .switch-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .switch {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #0d1b36;
+            border: 1px solid #0f3460;
+            border-radius: 22px;
+            transition: 0.2s;
+        }
+        .slider::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            left: 2px;
+            top: 2px;
+            background: #6a7a9a;
+            border-radius: 50%;
+            transition: 0.2s;
+        }
+        .switch input:checked + .slider {
+            background: #0f3460;
+            border-color: #64ffda;
+        }
+        .switch input:checked + .slider::before {
+            transform: translateX(18px);
+            background: #64ffda;
+        }
+        .switch-label {
+            font-size: 0.9rem;
+            color: #e0e0e0;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        /* Outer label: flex row for toggle + text */
+        .form-group > label.switch-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* ---- Status toast ---- */
+        .toast {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            background: #1a2a4a;
+            border: 1px solid #2a3a5a;
+            color: #e0e0e0;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast.error { border-color: #8b0000; }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 768px) {
+            .settings-sidebar { width: 180px; min-width: 180px; }
+            .settings-content { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="settings-layout">
+        <!-- Sidebar -->
+        <aside class="settings-sidebar">
+            <a href="{{ urlPath "/basic/" }}{{ .Project }}" class="sidebar-back">← Back to Dashboard</a>
+            <div class="sidebar-header">
+                <h2>Settings</h2>
+            </div>
+            <ul class="sidebar-nav" id="sidebarNav">
+                {{ range .Sections }}
+                <li class="sidebar-item" data-section="{{- .ID -}}">
+                    <a href="#{{- .ID -}}">{{- .Label -}}</a>
+                </li>
+                {{ end }}
+            </ul>
+
+            <!-- Danger zone -->
+            <div class="sidebar-danger">
+                <div class="sidebar-danger-title">Danger zone</div>
+                <button class="btn-delete" onclick="deleteProject()">Delete project</button>
+            </div>
+        </aside>
+
+        <!-- Content -->
+        <main class="settings-content">
+            <div style="color:#6a7a9a;font-size:0.85rem;margin-bottom:0.5rem;">{{ .Project }}</div>
+            <div class="settings-content-header">
+                <h1 id="sectionTitle">Core</h1>
+                <button class="btn btn-primary" id="saveBtn" onclick="saveSection()">Save</button>
+            </div>
+
+            {{ range .Sections }}
+            <div class="section-content" id="section-{{- .ID -}}" data-section="{{- .ID -}}">
+                {{ .HTML }}
+            </div>
+            {{ end }}
+        </main>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    const __URL_PREFIX__ = '{{ .prefix }}';
+    const __PROJECT__ = '{{ .Project }}';
+    function url(path) { return __URL_PREFIX__ + path; }
+
+    // ---- Section data ----
+    const sections = {{ .SectionData }};
+    let currentSection = '{{- index .SectionIDs 0 -}}';
+    let dirty = new Set();
+
+    // ---- Init ----
+    function init() {
+        // Show first section
+        showSection(currentSection);
+
+        // Hash navigation — decode to match raw data-section / id attributes
+        if (window.location.hash) {
+            let id = window.location.hash.slice(1);
+            try { id = decodeURIComponent(id); } catch (_) { /* already clean */ }
+            if (document.getElementById('section-' + id)) {
+                showSection(id);
+            }
+        }
+
+        // Listen for hash changes
+        window.addEventListener('hashchange', () => {
+            let id = window.location.hash.slice(1);
+            try { id = decodeURIComponent(id); } catch (_) { /* already clean */ }
+            if (id && document.getElementById('section-' + id)) {
+                showSection(id);
+            }
+        });
+
+        // Listen for unsaved changes
+        document.addEventListener('input', onFieldChange);
+        document.addEventListener('change', onFieldChange);
+    }
+
+    function showSection(id) {
+        // URL-decode: html/template auto-encodes "/" in href as "%2f",
+        // and the browser may double-encode it to "%252f" when navigating.
+        // Repeatedly decode until stable.
+        while (true) {
+            try {
+                const decoded = decodeURIComponent(id);
+                if (decoded === id) break;
+                id = decoded;
+            } catch (_) { break; }
+        }
+
+        currentSection = id;
+
+        // Update sidebar
+        document.querySelectorAll('.sidebar-nav li').forEach(li => {
+            li.classList.remove('active', 'sidebar-dirty');
+            if (li.dataset.section === id) {
+                li.classList.add('active');
+            }
+        });
+
+        // Update content visibility
+        document.querySelectorAll('.section-content').forEach(el => {
+            el.style.display = el.dataset.section === id ? 'block' : 'none';
+        });
+
+        // Update title
+        const section = sections[currentSection];
+        document.getElementById('sectionTitle').textContent = section ? section.label : currentSection;
+
+        // Update save button
+        updateSaveButton();
+
+        // Scroll to top
+        document.querySelector('.settings-content').scrollTop = 0;
+    }
+
+    function onFieldChange(e) {
+        const field = e.target.closest('[data-section]');
+        if (!field) return;
+        const sectionId = field.dataset.section;
+        const fieldName = e.target.dataset.field;
+        if (!sectionId || !fieldName) return;
+
+        if (e.target.type === 'checkbox') {
+            trackDirty(sectionId, fieldName, e.target.checked);
+        } else {
+            trackDirty(sectionId, fieldName, e.target.value);
+        }
+    }
+
+    function trackDirty(sectionId, fieldName, value) {
+        const key = fieldName;
+        const snap = sections[sectionId] && sections[sectionId].snapshots ? sections[sectionId].snapshots[key] : undefined;
+
+        if (String(value) !== String(snap)) {
+            dirty.add(sectionId);
+        } else {
+            dirty.delete(sectionId);
+        }
+        updateSaveButton();
+    }
+
+    function updateSaveButton() {
+        const btn = document.getElementById('saveBtn');
+        const isDirty = dirty.has(currentSection);
+        btn.classList.toggle('dirty', isDirty);
+        btn.textContent = isDirty ? 'Save ·' : 'Save';
+    }
+
+    function isSectionDirty(sectionId) {
+        return dirty.has(sectionId);
+    }
+
+    // ---- Save ----
+    function saveSection() {
+        const sectionId = currentSection;
+        const section = sections[sectionId];
+        if (!section) return;
+
+        // Collect field values from DOM
+        const fields = {};
+        section.fields.forEach(f => {
+            const el = document.querySelector(`[data-section="${sectionId}"][data-field="${f.key}"]`);
+            if (!el) return;
+            if (f.type === 'checkbox') {
+                fields[f.key] = el.checked;
+            } else {
+                fields[f.key] = el.value;
+            }
+        });
+
+        const payload = {
+            section: sectionId,
+            fields: fields
+        };
+
+        // Also send core fields inside fields if this is the core section
+        if (sectionId === 'core') {
+            const backendSel = document.getElementById('settingsBackend');
+            if (backendSel) fields.backend_ref = backendSel.value;
+            const hiddenChk = document.getElementById('settingsHidden');
+            if (hiddenChk) fields.hidden = hiddenChk.checked;
+            const desc = document.getElementById('settingsDescription');
+            if (desc) fields.description = desc.value;
+            const tags = document.getElementById('settingsTags');
+            if (tags) {
+                fields.tags = tags.value.split(',').map(t => t.trim()).filter(Boolean);
+            }
+            const friendly = document.getElementById('settingsFriendlyName');
+            if (friendly) fields.friendly_name = friendly.value;
+        }
+
+        const btn = document.getElementById('saveBtn');
+        btn.textContent = 'Saving...';
+        btn.disabled = true;
+
+        fetch(url('/api/' + __PROJECT__ + '/settings'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(data => {
+            // Update snapshot
+            if (sections[sectionId] && sections[sectionId].snapshots) {
+                Object.assign(sections[sectionId].snapshots, data.saved_fields || data);
+            }
+            dirty.delete(sectionId);
+            updateSaveButton();
+            showToast('Saved');
+        })
+        .catch(err => {
+            showToast('Save failed: ' + err.message, true);
+        })
+        .finally(() => {
+            btn.textContent = 'Save';
+            btn.disabled = false;
+        });
+    }
+
+    // ---- Toast ----
+    function showToast(msg, isError) {
+        const toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.classList.toggle('error', !!isError);
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    // ---- On unload: warn about unsaved changes ----
+    window.addEventListener('beforeunload', (e) => {
+        for (const sid of dirty) {
+            if (isSectionDirty(sid)) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            }
+        }
+    });
+
+    // ---- Delete project ----
+    function deleteProject() {
+        if (!__PROJECT__) return;
+        if (!confirm('Delete project "' + __PROJECT__ + '"? This will permanently remove all elements, images, metadata, and job records.')) return;
+        fetch(url('/api/' + __PROJECT__ + '/delete'), { method: 'POST' })
+            .then(r => {
+                if (r.ok) {
+                    window.location.href = url('/');
+                } else {
+                    r.text().then(msg => alert('Delete failed: ' + msg));
+                }
+            })
+            .catch(() => alert('Delete failed'));
+    }
+
+    // ---- Run ----
+    init();
+    </script>
+</body>
+</html>

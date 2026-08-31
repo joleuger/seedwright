@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }}{{ if .Project }} — {{ .Project }}{{ end }}</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh}
+        .nav{background:#16213e;border-bottom:1px solid #0f3460;padding:0.75rem 1.5rem;display:flex;align-items:center;gap:1.5rem}
+        .nav a{color:#a0a0b0;text-decoration:none;font-size:0.9rem;padding:0.3rem 0.6rem;border-radius:4px}
+        .nav a:hover,.nav a.active{color:#e94560;background:rgba(233,69,96,0.1)}
+        .nav .logo{font-weight:700;font-size:1.1rem;color:#e94560;margin-right:auto}
+        .nav .project-name{color:#53d8fb;font-weight:600}
+        .container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+        .flash{background:#0f3460;border-left:4px solid #53d8fb;padding:0.75rem 1rem;margin-bottom:1.5rem;border-radius:0 4px 4px 0}
+        .flash.error{border-left-color:#e94560;background:rgba(233,69,96,0.1)}
+        h1{font-size:1.5rem;margin-bottom:1rem;color:#fff}
+        h2{font-size:1.2rem;margin-bottom:0.75rem;color:#ccc}
+        .card{background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem}
+        .btn{display:inline-block;background:#e94560;color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:4px;font-size:0.9rem;cursor:pointer;text-decoration:none}
+        .btn:hover{background:#c73652}.btn-secondary{background:#0f3460}.btn-secondary:hover{background:#1a4a8a}
+        .gallery-controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem}
+        .gallery-controls-left{display:flex;align-items:center;gap:0.75rem}
+        .gallery-controls-right{display:flex;align-items:center;gap:0.75rem}
+        .per-page-select{background:#16213e;color:#a0a0b0;border:1px solid #0f3460;padding:0.3rem 0.5rem;border-radius:4px;font-size:0.85rem;cursor:pointer}
+        .per-page-select:hover{border-color:#e94560}
+        .fav-filter-btn{background:#16213e;color:#a0a0b0;border:1px solid #0f3460;padding:0.3rem 0.7rem;border-radius:4px;font-size:0.85rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem}
+        .fav-filter-btn:hover{border-color:#f0c040}
+        .fav-filter-btn.active{color:#f0c040;border-color:#f0c040;background:rgba(240,192,64,0.08)}
+        .slideshow-btn{background:#16213e;color:#a0a0b0;border:1px solid #0f3460;padding:0.3rem 0.7rem;border-radius:4px;font-size:0.85rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem}
+        .slideshow-btn:hover{border-color:#53d8fb;color:#53d8fb}
+        .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-top:1rem}
+        .gallery-item{background:#16213e;border:1px solid #0f3460;border-radius:8px;overflow:hidden;text-decoration:none;color:inherit;transition:transform 0.2s,border-color 0.2s;position:relative}
+        .gallery-item:hover{transform:translateY(-2px);border-color:#e94560}
+        .gallery-item .fav-btn{position:absolute;top:0.5rem;right:0.5rem;z-index:1}
+        .gallery-item .fav-btn{background:none;border:1px solid rgba(255,255,255,0.2);color:#e0e0e0;padding:0.2rem 0.4rem;border-radius:4px;cursor:pointer;font-size:1rem;line-height:1;backdrop-filter:blur(4px)}
+        .gallery-item .fav-btn:hover{border-color:#f0c040;background:rgba(240,192,64,0.1)}
+        .gallery-item .fav-btn.active{color:#f0c040;border-color:#f0c040}
+        .gallery-item img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+        .gallery-item .placeholder{width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:#0d1b36;border-radius:0 0 8px 0;color:#a0a0b0;font-size:0.8rem;border-top:1px solid #0f3460}
+        .gallery-item .meta{padding:0.5rem;font-size:0.75rem;color:#a0a0b0}
+        .pagination{display:flex;gap:0.5rem;margin-top:1.5rem;justify-content:center;flex-wrap:wrap}
+        .pagination a,.pagination span{padding:0.4rem 0.8rem;border-radius:4px;text-decoration:none;font-size:0.85rem}
+        .pagination a{background:#16213e;color:#a0a0b0;border:1px solid #0f3460}
+        .pagination a:hover{background:#0f3460;color:#fff}
+        .pagination .current{background:#e94560;color:#fff}
+        .empty-state{text-align:center;padding:3rem;color:#a0a0b0}
+    </style>
+</head>
+<body>
+    <script>
+    window.__EXTENSIONS__ = { {{ range $i, $k := .EnabledExtensions }}{{ if $i }},{{ end }}"{{ $k }}": true{{ end }} };
+    </script>
+    <nav class="nav">
+        <a class="logo" href="{{ urlPath "/" }}">seedwright</a>
+        {{ if .Project }}
+        <span class="project-name">{{ .Project }}</span>
+        <a href="{{ urlPath (print "/basic/" .Project) }}" {{ if eq .Page "dashboard" }}class="active"{{ end }}>Dashboard</a>
+        <a href="{{ urlPath (print "/basic/" .Project "/gallery") }}" {{ if eq .Page "gallery" }}class="active"{{ end }}>Gallery</a>
+        <a href="{{ urlPath (print "/basic/" .Project "/external") }}" {{ if eq .Page "external" }}class="active"{{ end }}>Upload</a>
+        {{ if .NavItems }}{{ .NavItems | safeHTML }}{{ end }}
+        {{ else }}
+        <a href="{{ urlPath "/" }}" class="active">Home</a>
+        {{ end }}
+    </nav>
+    <div class="container">
+        {{ if .Flash }}<div class="flash">{{ .Flash }}</div>{{ end }}
+        {{ if .Error }}<div class="flash error">{{ .Error }}</div>{{ end }}
+
+        <h1>Gallery — {{ .Project }}</h1>
+
+        <div class="card" data-favorites="{{ if .FavoritesActive }}true{{ else }}false{{ end }}">
+            <div class="gallery-controls">
+                <div class="gallery-controls-left">
+                    <span style="color:#a0a0b0;font-size:0.85rem;">
+                        {{ len .Gallery }} of {{ .Total }} images
+                    </span>
+                    <select class="per-page-select" id="perPageSelect" onchange="changePerPage(this.value)">
+                        <option value="24"{{ if eq .PerPageCurrent "24" }} selected{{ end }}>24</option>
+                        <option value="50"{{ if eq .PerPageCurrent "50" }} selected{{ end }}>50</option>
+                        <option value="200"{{ if eq .PerPageCurrent "200" }} selected{{ end }}>200</option>
+                        <option value="all"{{ if eq .PerPageCurrent "all" }} selected{{ end }}>All</option>
+                    </select>
+                    {{ if hasExtension "joleuger/favorites" }}
+                    <button class="fav-filter-btn{{ if .FavoritesActive }} active{{ end }}" onclick="toggleFavoritesFilter()" title="Show only favorites">
+                        {{ if .FavoritesActive }}⭐ Favorites{{ else }}☆ Favorites{{ end }}
+                    </button>
+                    {{ end }}
+                    {{ if hasExtension "joleuger/slideshow" }}
+                    <button class="slideshow-btn" onclick="startSlideshow()" title="Play the current gallery selection as a slideshow">▶ Slideshow</button>
+                    {{ end }}
+                </div>
+                <div class="gallery-controls-right">
+                    <a href="{{ urlPath (print "/basic/" .Project) }}" class="btn btn-secondary">← Dashboard</a>
+                </div>
+            </div>
+
+            {{ if .Gallery }}
+            <div class="gallery-grid">
+                {{ range .Gallery }}
+                <div class="gallery-item">
+                    <a href="{{ urlPath (print "/basic/" $.Project "/element/" .ID) }}">
+                        {{ if .Image }}
+                        <img src="{{ urlPath (print "/basic/" $.Project "/element/" .ID "/image") }}" alt="Generated" loading="lazy">
+                        {{ else }}
+                        <div class="placeholder">Image missing — regenerate below</div>
+                        {{ end }}
+                    </a>
+                    {{ if hasExtension "joleuger/favorites" }}
+                    <button class="fav-btn{{ if eq (getFieldInt . "e.ext_joleuger_favorites_is_favorite") 1 }} active{{ end }}" onclick="toggleGalleryFav('{{ $.Project }}', '{{ .ID }}', this)" title="Toggle favorite">{{ if eq (getFieldInt . "e.ext_joleuger_favorites_is_favorite") 1 }}⭐{{ else }}☆{{ end }}</button>
+                    {{ end }}
+                    {{ if .Generation }}<div class="meta">Seed: {{ .Generation.Seed }}</div>{{ end }}
+                </div>
+                {{ end }}
+            </div>
+            {{ else }}
+            <div class="empty-state">
+                <p>No images generated yet.</p>
+                <p style="margin-top:0.5rem;">
+                    <a href="{{ urlPath (print "/basic/" .Project) }}" class="btn">Generate your first image</a>
+                </p>
+            </div>
+            {{ end }}
+        </div>
+
+        {{ if gt .TotalPages 1 }}
+        <div class="pagination">
+            {{ if gt .PageNum 1 }}
+            <a href="?page={{ .PrevPage }}&per_page={{ .PerPageCurrent }}{{ if .FavoritesActive }}&favorites=true{{ end }}">← Prev</a>
+            {{ end }}
+            <span class="current">{{ .PageNum }} / {{ .TotalPages }}</span>
+            {{ if lt .PageNum .TotalPages }}
+            <a href="?page={{ .NextPage }}&per_page={{ .PerPageCurrent }}{{ if .FavoritesActive }}&favorites=true{{ end }}">Next →</a>
+            {{ end }}
+        </div>
+        {{ end }}
+    </div>
+
+    <script>
+    (function() {
+        var PROJECT = '{{ .Project }}';
+
+        // Prefix-aware URL helper
+        var __URL_PREFIX__ = '{{ .prefix }}';
+        function url(path) { return __URL_PREFIX__ + path; }
+
+        // Per-page localStorage key
+        var PER_PAGE_KEY = 'sdcpp_gallery_per_page';
+
+        // Load saved per_page from localStorage
+        var saved = localStorage.getItem(PER_PAGE_KEY);
+        if (saved) {
+            var sel = document.getElementById('perPageSelect');
+            if (sel) sel.value = saved;
+        }
+
+        // Build base URL with preserved query params (page, sort, order, per_page, favorites)
+        function buildGalleryURL(params) {
+            var base = url('/basic/' + PROJECT + '/gallery');
+            var existing = new URLSearchParams(window.location.search);
+            for (var key in params) {
+                existing.set(key, params[key]);
+            }
+            return base + '?' + existing.toString();
+        }
+
+        window.changePerPage = function(value) {
+            localStorage.setItem(PER_PAGE_KEY, value);
+            // Navigate to page 1 with new per_page, preserving other params
+            window.location.href = buildGalleryURL({page: '1', per_page: value});
+        };
+
+        // Toggle favorites filter (show only favorites)
+        window.toggleFavoritesFilter = function() {
+            var current = new URLSearchParams(window.location.search).get('favorites');
+            if (current === 'true') {
+                // Remove favorites param to show all
+                var existing = new URLSearchParams(window.location.search);
+                existing.delete('favorites');
+                existing.set('page', '1');
+                window.location.href = url('/basic/' + PROJECT + '/gallery?' + existing.toString());
+            } else {
+                window.location.href = buildGalleryURL({favorites: 'true', page: '1'});
+            }
+        };
+
+        // Start the slideshow (joleuger/slideshow extension) with the
+        // current gallery filters — pagination is dropped server-side.
+        window.startSlideshow = function() {
+            var existing = new URLSearchParams(window.location.search);
+            existing.delete('page');
+            existing.delete('per_page');
+            var qs = existing.toString();
+            window.location.href = url('/basic/' + PROJECT + '/slideshow') + (qs ? '?' + qs : '');
+        };
+
+        window.toggleGalleryFav = function(project, elementId, btn) {
+            // Optimistic toggle
+            var isActive = btn.classList.contains('active');
+            btn.textContent = isActive ? '☆' : '⭐';
+            btn.classList.toggle('active', !isActive);
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', url('/api/' + project + '/favorites/toggle'), true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onload = function() {
+                if (xhr.status !== 200) {
+                    // Revert on failure
+                    btn.textContent = isActive ? '⭐' : '☆';
+                    btn.classList.toggle('active', isActive);
+                }
+            };
+            xhr.send(JSON.stringify({element_id: elementId}));
+        };
+    })();
+    </script>
+</body>
+</html>

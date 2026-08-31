@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>{{ .Title }} — {{ .Project }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+        /* Camera view */
+        #cameraView {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+        #video.rear { transform: scaleX(1); }
+        #canvas { display: none; }
+
+        /* Captured image preview overlay */
+        #captureOverlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            flex-direction: column;
+        }
+        #captureOverlay.active { display: flex; }
+        #capturedImage {
+            max-width: 90%;
+            max-height: 75%;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+        }
+        .capture-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .capture-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            min-width: 120px;
+        }
+        .capture-btn.retake {
+            background: #16213e;
+            color: #a0a0b0;
+            border: 1px solid #0f3460;
+        }
+        .capture-btn.retake:hover { background: #0f3460; color: #fff; }
+        .capture-btn.keep {
+            background: #00b894;
+            color: #fff;
+        }
+        .capture-btn.keep:hover { background: #00a381; }
+        .capture-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Photobooth 2.0 — print controls in the capture preview.
+           Layout matches the proven old photobooth system: copy-count
+           buttons on the left, print/cancel icons on the right.
+           The copy-count buttons are a vanilla port of
+           NumberOfPhotosButton from old-photo-app.html (MIT, project
+           owner's own code); the icons are from material.io (Apache-2.0). */
+        .pb-print-actions {
+            display: flex;
+            width: 90%;
+            max-width: 820px;
+            margin-top: 1.25rem;
+            gap: 1rem;
+            align-items: flex-end;
+            justify-content: space-between;
+        }
+        .pb-copy-count { display: flex; align-items: center; gap: 0.4rem; }
+        .pb-copy-btn {
+            display: flex;
+            align-items: center;
+            background: transparent;
+            border: none;
+            color: #fff;
+            padding: 3px;
+            margin: 2px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .pb-copy-btn>svg { fill: currentColor; }
+        .pb-copy-btn>svg.photoNumber {
+            margin-right: -10px;
+            margin-left: -10px;
+        }
+        .pb-copy-btn:not(.active)>svg.photoNumber {
+            background-color: rgb(56, 135, 155);
+        }
+        .pb-copy-btn.active>svg.photoNumber {
+            background-color: rgb(175, 116, 76);
+        }
+        .pb-copy-btn.active {
+            background-color: rgb(175, 116, 76);
+        }
+        .pb-action-col {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            align-items: stretch;
+        }
+        .pb-print-row {
+            display: flex;
+            gap: 0.6rem;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        .pb-icon-btn {
+            width: 52px;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #16213e;
+            border: 1px solid #0f3460;
+            border-radius: 50%;
+            color: #e0e0e0;
+            padding: 0;
+            cursor: pointer;
+        }
+        .pb-icon-btn>svg { fill: currentColor; }
+        .pb-icon-btn:hover { background: #0f3460; }
+        .pb-print-btn { background: #00b894; border-color: #00b894; color: #fff; }
+        .pb-print-btn:hover { background: #00a381; }
+        .pb-print-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background: #16213e;
+            border-color: #0f3460;
+            color: #6a7a9a;
+        }
+        .pb-printer-hint {
+            color: #f39c12;
+            font-size: 0.8rem;
+            text-align: right;
+        }
+
+        /* Controls bar */
+        #controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 2rem 1rem 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+            z-index: 10;
+        }
+
+        /* Shutter button */
+        #shutterBtn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #38879b;
+            border: 4px solid #fff;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+        }
+        #shutterBtn:active {
+            transform: scale(0.9);
+            background: #e94560;
+        }
+
+        /* Camera switch button */
+        #switchCam {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #0f3460;
+            color: #e0e0e0;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #switchCam:hover { background: rgba(0, 0, 0, 0.7); border-color: #53d8fb; }
+
+        /* Navigation bar */
+        #navBar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(rgba(0, 0, 0, 0.7), transparent);
+            z-index: 10;
+        }
+        #navBar a {
+            color: #a0a0b0;
+            text-decoration: none;
+            font-size: 0.85rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+        }
+        #navBar a:hover { color: #53d8fb; }
+
+        /* Error state */
+        #errorState {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 2rem;
+            text-align: center;
+        }
+        #errorState.active { display: flex; }
+        #errorState .error-icon { font-size: 3rem; margin-bottom: 1rem; }
+        #errorState .error-msg { color: #e94560; font-size: 1.1rem; margin-bottom: 0.5rem; }
+        #errorState .error-detail { color: #a0a0b0; font-size: 0.85rem; margin-bottom: 1.5rem; }
+        #errorState .back-btn {
+            background: #16213e;
+            border: 1px solid #0f3460;
+            color: #a0a0b0;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        #errorState .back-btn:hover { background: #0f3460; color: #fff; }
+
+        /* Loading state */
+        #loadingState {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #0f3460;
+            border-top-color: #53d8fb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #loadingState .loading-text { color: #a0a0b0; font-size: 0.9rem; }
+
+        /* Save progress overlay */
+        #saveOverlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 1rem;
+            z-index: 200;
+        }
+        #saveOverlay.active { display: flex; }
+        #saveOverlay .save-text { color: #a0a0b0; font-size: 1rem; }
+        #saveOverlay .spinner { width: 50px; height: 50px; border-width: 4px; }
+
+        /* Secure context error — shown when page is not HTTPS/localhost */
+        #secureError {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 2rem;
+            text-align: center;
+        }
+        #secureError.active { display: flex; }
+        #secureError .icon { font-size: 3rem; margin-bottom: 1rem; }
+        #secureError .title { color: #f39c12; font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; }
+        #secureError .body { color: #a0a0b0; font-size: 0.9rem; line-height: 1.6; max-width: 400px; margin-bottom: 1.5rem; }
+        #secureError .back-btn {
+            background: #16213e;
+            border: 1px solid #0f3460;
+            color: #a0a0b0;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        #secureError .back-btn:hover { background: #0f3460; color: #fff; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <div id="navBar">
+        <a href="/basic/{{ .Project }}" onclick="event.preventDefault(); goBack()">← Back</a>
+    </div>
+
+    <!-- Camera view -->
+    <div id="cameraView">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+        <button id="switchCam" onclick="switchCamera()" title="Switch camera">📷</button>
+        <div id="controls">
+            <button id="shutterBtn" onclick="capture()"></button>
+        </div>
+    </div>
+
+    <!-- Loading state -->
+    <div id="loadingState">
+        <div class="spinner"></div>
+        <div class="loading-text">Starting camera...</div>
+    </div>
+
+    <!-- Error state -->
+    <div id="errorState">
+        <div class="error-icon">📷</div>
+        <div class="error-msg" id="errorMsg">Camera access denied</div>
+        <div class="error-detail" id="errorDetail">Please allow camera permissions and try again.</div>
+        <a class="back-btn" href="/basic/{{ .Project }}">← Go back</a>
+    </div>
+
+    <!-- Secure context error — shown when page is not HTTPS/localhost -->
+    <div id="secureError">
+        <div class="icon">🔒</div>
+        <div class="title">Camera requires a secure connection</div>
+        <div class="body">
+            The camera API only works over <strong>HTTPS</strong> or on <strong>localhost</strong>.<br><br>
+            If you're accessing this page remotely, please use <code>https://</code> instead of <code>http://</code>.<br><br>
+            Alternatively, open it directly on the iPad via <code>http://localhost:8080</code>.
+        </div>
+        <a class="back-btn" href="/basic/{{ .Project }}">← Go back</a>
+    </div>
+
+    <!-- Capture preview overlay -->
+    <div id="captureOverlay">
+        <img id="capturedImage" alt="Captured">
+        {{ if .PrintAvailable }}
+        <!-- Photobooth 2.0 print controls: copy-count buttons on the left
+             (each button draws N overlapping photo icons so the count is
+             readable without reading digits), print/cancel icons on the
+             right. No Retake in print mode — the ✕ is the exit (it saves
+             iff keep_on_cancel is on). Matches the proven layout of the
+             old photobooth system. -->
+        <div class="pb-print-actions">
+            <div id="pbCopyCount" class="pb-copy-count"></div>
+            <div class="pb-action-col">
+                <div class="pb-print-row">
+                    <button class="pb-icon-btn pb-print-btn" id="pbPrintBtn" onclick="pbPrint()" title="Print">
+                        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><use href="#materialio_print"/></svg>
+                    </button>
+                    <button class="pb-icon-btn pb-cancel-btn" onclick="pbCancel()" title="Done">
+                        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><use href="#materialio_cancel"/></svg>
+                    </button>
+                </div>
+                <div id="pbPrinterHint" class="pb-printer-hint" style="display:none">No printer configured</div>
+            </div>
+        </div>
+        {{ else }}
+        <div class="capture-actions">
+            <button class="capture-btn retake" onclick="retake()">📷 Retake</button>
+            <button class="capture-btn keep" onclick="keep()">✓ Keep</button>
+        </div>
+        {{ end }}
+    </div>
+
+    <!-- material.io icons, imported from material.io and licensed under the
+         Apache License 2.0 — see https://www.apache.org/licenses/LICENSE-2.0.html
+         Referenced via <use> by the copy-count / print / cancel buttons. -->
+    <div style="display:none" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="24" height="24" viewBox="0 0 24 24">
+            <g id="materialio_photo">
+                <path d="M0 0h24v24H0z" fill="none" />
+                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+            </g>
+        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="24" height="24" viewBox="0 0 24 24">
+            <g id="materialio_print">
+                <path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z" />
+                <path d="M0 0h24v24H0z" fill="none" />
+            </g>
+        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="24" height="24" viewBox="0 0 24 24">
+            <g id="materialio_cancel">
+                <path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z" />
+                <path d="M0 0h24v24H0z" fill="none" />
+            </g>
+        </svg>
+    </div>
+
+    <!-- Save overlay -->
+    <div id="saveOverlay">
+        <div class="spinner"></div>
+        <div class="save-text">Saving image...</div>
+    </div>
+
+    <script>
+    const __URL_PREFIX__ = '{{ .prefix }}';
+    function url(path) { return __URL_PREFIX__ + path; }
+
+    const project = '{{ .Project }}';
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const cameraView = document.getElementById('cameraView');
+    const loadingState = document.getElementById('loadingState');
+    const errorState = document.getElementById('errorState');
+    const captureOverlay = document.getElementById('captureOverlay');
+    const saveOverlay = document.getElementById('saveOverlay');
+    const capturedImage = document.getElementById('capturedImage');
+
+    let currentStream = null;
+    let useRearCamera = false;
+
+    async function startCamera() {
+        showState('loading');
+
+        const constraints = {
+            video: {
+                facingMode: useRearCamera ? 'environment' : 'user',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
+            audio: false
+        };
+
+        try {
+            if (currentStream) {
+                currentStream.getTracks().forEach(t => t.stop());
+            }
+            currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = currentStream;
+            video.classList.toggle('rear', useRearCamera);
+            showState('camera');
+        } catch (err) {
+            console.error('Camera error:', err);
+            let msg = 'Camera access denied';
+            let detail = 'Please allow camera permissions and try again.';
+            if (err.name === 'NotAllowedError') {
+                msg = 'Camera permission denied';
+                detail = 'Enable camera access in your browser settings.';
+            } else if (err.name === 'NotFoundError') {
+                msg = 'No camera found';
+                detail = 'Connect a camera or check your device settings.';
+            } else if (err.name === 'NotReadableError') {
+                msg = 'Camera in use';
+                detail = 'Close other apps using the camera.';
+            } else {
+                detail = err.message || 'Unknown camera error.';
+            }
+            document.getElementById('errorMsg').textContent = msg;
+            document.getElementById('errorDetail').textContent = detail;
+            showState('error');
+        }
+    }
+
+    function switchCamera() {
+        useRearCamera = !useRearCamera;
+        startCamera();
+    }
+
+    function capture() {
+        // Set canvas to video dimensions
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+
+        // Mirror if using front camera
+        if (!useRearCamera) {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+        }
+        ctx.drawImage(video, 0, 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+        // Get JPEG data URL
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        capturedImage.src = dataUrl;
+        captureOverlay.classList.add('active');
+        {{ if .PrintAvailable }}
+        initPrintControls();
+        {{ end }}
+    }
+
+    function retake() {
+        captureOverlay.classList.remove('active');
+    }
+
+    async function keep() {
+        captureOverlay.classList.remove('active');
+        saveOverlay.classList.add('active');
+
+        const imgData = capturedImage.src;
+        const payload = JSON.stringify({ image: imgData });
+
+        try {
+            const resp = await fetch(url('/api/' + project + '/ext/joleuger/photobooth/save'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: payload
+            });
+
+            if (resp.ok) {
+                const contentType = resp.headers.get('Content-Type');
+                let json;
+                const text = await resp.text();
+                if (contentType && contentType.includes('application/json')) {
+                    json = JSON.parse(text);
+                }
+                // Stay in photobooth — camera view + toast.
+                // The user can take the next picture immediately.
+                showState('camera');
+                showToast('Image saved ✓');
+                return;
+            } else {
+                let msg = 'Failed to save image';
+                try {
+                    const err = JSON.parse(text);
+                    if (err.error) msg = err.error;
+                } catch (_) {}
+                showToast(msg + ' — try again');
+            }
+        } catch (err) {
+            console.error('Save error:', err);
+            showToast('Network error — check your connection');
+        } finally {
+            saveOverlay.classList.remove('active');
+        }
+    }
+
+    {{ if .PrintAvailable }}
+    // ---- Photobooth 2.0: print controls in the capture preview ----
+    // The copy-count buttons are a vanilla port of NumberOfPhotosButton
+    // from old-photo-app.html (MIT, project owner's own code): each button
+    // draws N overlapping photo icons so the copy count is readable at a
+    // glance, also for children who cannot read. Icons: material.io,
+    // Apache-2.0 (see the SVG defs above).
+    const MAX_PHOTOS = {{ .MaxPhotos }};
+    const KEEP_ON_CANCEL = {{ if .KeepOnCancel }}true{{ else }}false{{ end }};
+    // The printer is configured once in the project settings (print_printer);
+    // the user is never asked which printer to use in photobooth mode.
+    const CONFIGURED_PRINTER = {{ .PrinterURI }};
+
+    let copies = 1;
+    let printers = [];
+    let printersLoaded = false;
+
+    function buildCopyCountButtons() {
+        const container = document.getElementById('pbCopyCount');
+        if (!container) return;
+        container.innerHTML = '';
+        for (let n = 1; n <= MAX_PHOTOS; n++) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'pb-copy-btn' + (n === copies ? ' active' : '');
+            btn.title = n + (n === 1 ? ' photo' : ' photos');
+            for (let i = 0; i < n; i++) {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 24 24');
+                svg.setAttribute('width', '36');
+                svg.setAttribute('height', '36');
+                svg.setAttribute('class', 'photoNumber');
+                const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+                use.setAttribute('href', '#materialio_photo');
+                svg.appendChild(use);
+                btn.appendChild(svg);
+            }
+            btn.addEventListener('click', function () {
+                copies = n;
+                refreshCopyButtons();
+            });
+            container.appendChild(btn);
+        }
+    }
+
+    function refreshCopyButtons() {
+        document.querySelectorAll('#pbCopyCount .pb-copy-btn').forEach(function (b, i) {
+            b.classList.toggle('active', i + 1 === copies);
+        });
+    }
+
+    async function loadPrinters() {
+        // ?configured=true: the overlay works exclusively with configured
+        // printers (no lpstat discovery).
+        try {
+            const resp = await fetch(url('/api/' + project + '/ext/joleuger/printer/printers?configured=true'), {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!resp.ok) return [];
+            const data = await resp.json();
+            return data.printers || [];
+        } catch (_) {
+            return [];
+        }
+    }
+
+    // Enable the print button only when a printer is configured in the
+    // project settings AND it is currently available (in the printer
+    // extension's list). The overlay never asks the user to choose.
+    function setupPrintAvailability() {
+        const btn = document.getElementById('pbPrintBtn');
+        const hint = document.getElementById('pbPrinterHint');
+        if (!btn) return;
+        if (!CONFIGURED_PRINTER) {
+            btn.disabled = true;
+            if (hint) {
+                hint.textContent = 'No printer configured — see project settings';
+                hint.style.display = 'block';
+            }
+            return;
+        }
+        if (!printers.some(p => p.uri === CONFIGURED_PRINTER)) {
+            btn.disabled = true;
+            if (hint) {
+                hint.textContent = 'Printer not available right now';
+                hint.style.display = 'block';
+            }
+            return;
+        }
+        btn.disabled = false;
+        if (hint) hint.style.display = 'none';
+    }
+
+    async function initPrintControls() {
+        buildCopyCountButtons();
+        if (!printersLoaded) {
+            printers = await loadPrinters();
+            printersLoaded = true;
+        }
+        setupPrintAvailability();
+    }
+
+    // Save the captured photo via the existing save endpoint and return
+    // the new element ID, or null on failure (with a toast).
+    async function pbSaveImage() {
+        const payload = JSON.stringify({ image: capturedImage.src });
+        const resp = await fetch(url('/api/' + project + '/ext/joleuger/photobooth/save'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: payload
+        });
+        if (!resp.ok) {
+            let msg = 'Failed to save image';
+            try {
+                const err = await resp.json();
+                if (err.error) msg = err.error;
+            } catch (_) {}
+            showToast(msg + ' — try again');
+            return null;
+        }
+        let data = {};
+        try {
+            data = await resp.json();
+        } catch (_) {}
+        return data.element_id || null;
+    }
+
+    // Print: save the photo first, then submit the print job. On save
+    // failure the preview stays open so the user can retry; if the save
+    // succeeded but the print job failed, the element remains in the
+    // gallery and can be printed from there.
+    async function pbPrint() {
+        if (!CONFIGURED_PRINTER) {
+            showToast('No printer configured — see project settings');
+            return;
+        }
+        saveOverlay.classList.add('active');
+        const elementID = await pbSaveImage();
+        if (!elementID) {
+            saveOverlay.classList.remove('active');
+            return;
+        }
+        let result;
+        try {
+            const resp = await fetch(url('/api/' + project + '/ext/joleuger/printer/print'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ element_id: elementID, printer_uri: CONFIGURED_PRINTER, copies: copies })
+            });
+            const data = await resp.json().catch(() => ({}));
+            result = { ok: resp.ok, data: data };
+        } catch (_) {
+            result = { ok: false, data: {} };
+        }
+        saveOverlay.classList.remove('active');
+        captureOverlay.classList.remove('active');
+        showState('camera');
+        if (result.ok) {
+            showToast('Printed ' + copies + (copies === 1 ? ' photo' : ' photos') +
+                (result.data.job_id ? ' (job ' + result.data.job_id + ')' : '') + ' ✓');
+        } else {
+            const detail = result.data.error ? ' — ' + result.data.error : '';
+            showToast('Image saved, but printing failed' + detail + '. Retry printing from the gallery.');
+        }
+    }
+
+    // ✕ (Done): close the preview. Saves the photo when keep_on_cancel is
+    // enabled (the default), discards it otherwise.
+    function pbCancel() {
+        if (KEEP_ON_CANCEL) {
+            saveOverlay.classList.add('active');
+            pbSaveImage().then(function () {
+                saveOverlay.classList.remove('active');
+                captureOverlay.classList.remove('active');
+                showState('camera');
+            });
+        } else {
+            captureOverlay.classList.remove('active');
+            showState('camera');
+        }
+    }
+
+    {{ end }}
+
+    function showState(state) {
+        cameraView.style.display = state === 'camera' ? 'flex' : 'none';
+        loadingState.style.display = state === 'loading' ? 'flex' : 'none';
+        errorState.className = state === 'error' ? 'active' : '';
+    }
+
+    function showToast(msg) {
+        const toast = document.createElement('div');
+        toast.textContent = msg;
+        toast.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#0a0a1a;border:1px solid #0f3460;color:#e0e0e0;padding:0.75rem 1.5rem;border-radius:8px;z-index:2000;opacity:0;transition:opacity 0.3s;pointer-events:none;font-size:0.9rem';
+        document.body.appendChild(toast);
+        requestAnimationFrame(() => { toast.style.opacity = '1'; });
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 2500);
+    }
+
+    function goBack() {
+        if (currentStream) {
+            currentStream.getTracks().forEach(t => t.stop());
+            currentStream = null;
+        }
+        window.history.back();
+    }
+
+    // Go fullscreen on load (optional, browser may require user interaction)
+    function tryFullscreen() {
+        const el = document.documentElement;
+        if (el.requestFullscreen) el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    }
+
+    // Start camera and try fullscreen
+    // Check for secure context first: navigator.mediaDevices requires HTTPS or localhost
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.warn('Camera API unavailable — not served over HTTPS/localhost');
+        document.getElementById('secureError').classList.add('active');
+    } else {
+        startCamera();
+    }
+    document.addEventListener('click', function initOnce() {
+        tryFullscreen();
+        document.removeEventListener('click', initOnce);
+    }, { once: true });
+
+    // Capture trigger key listener — reads from localStorage so it works
+    // without server roundtrip.  Bound to the photobooth page only.
+    (function() {
+        function isTypingTarget(el) {
+            if (!el) return false;
+            var tag = el.tagName;
+            return el.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+        }
+
+        window.addEventListener('keydown', function(e) {
+            var boundCode = localStorage.getItem('photobooth.captureKeyCode');
+            if (!boundCode || e.code !== boundCode) return;
+            if (isTypingTarget(document.activeElement)) return;
+            if (e.repeat) return;
+            e.preventDefault();
+            capture();
+        });
+    })();
+    </script>
+</body>
+</html>

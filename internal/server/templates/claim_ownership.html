@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} — Claim Global Ownership</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+        .card{background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:2.5rem;max-width:480px;width:90%}
+        .btn{display:inline-block;background:#e94560;color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:4px;font-size:0.9rem;cursor:pointer;text-decoration:none;margin-top:1rem}
+        .btn:hover{background:#c73652}
+        .btn:disabled{background:#555;cursor:not-allowed}
+        .flash{background:#0f3460;border-left:4px solid #53d8fb;padding:0.75rem 1rem;margin-bottom:1.5rem;border-radius:0 4px 4px 0}
+        .flash.error{border-left-color:#e94560;background:rgba(233,69,96,0.1)}
+        h1{font-size:1.3rem;margin-bottom:1rem;color:#fff}
+        p{color:#a0a0b0;font-size:0.9rem;line-height:1.6;margin-bottom:1rem}
+        code{background:#0d1b36;padding:0.15rem 0.4rem;border-radius:3px;font-size:0.85rem;color:#53d8fb}
+        .back{display:inline-block;margin-top:1.5rem;color:#a0a0b0;text-decoration:none;font-size:0.85rem}
+        .back:hover{color:#e94560}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Claim Global Ownership</h1>
+
+        {{ if .NoClaimSupport }}
+        <p>The active authorization engine ({{ .Principal }}) doesn't support dynamic ownership claims — edit <code>auth.principal</code> in <code>config.yaml</code> and restart to change the admin principal.</p>
+        <a href="{{ .RedirectURL }}" class="btn">← Back to Home</a>
+        {{ else if .CanClaim }}
+        <p>You are currently identified as <code>{{ .Principal }}</code>. Claiming Global Ownership grants you the <strong>Admin</strong> role (Owner) across all projects — equivalent to the bootstrap <code>user:root</code> principal.</p>
+
+        <p style="font-size:0.8rem;color:#8080a0;margin-bottom:1.5rem;">This is the control-plane mechanism: it writes directly into the data-plane's bookkeeping when the bookkeeping's own rules would otherwise make that impossible.</p>
+
+        <form method="post">
+            <button type="submit" class="btn">Claim Global Ownership</button>
+        </form>
+        {{ else }}
+        <p>You already hold Global Ownership. No further action needed.</p>
+        <a href="{{ .RedirectURL }}" class="btn">← Back to Home</a>
+        {{ end }}
+
+        {{ if .Message }}
+        <div class="flash {{ .MessageClass }}">{{ .Message }}</div>
+        {{ end }}
+    </div>
+</body>
+</html>

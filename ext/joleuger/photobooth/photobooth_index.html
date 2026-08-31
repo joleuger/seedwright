@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>{{ .Title }} — Photobooth</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow-x: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
+
+        /* Chromeless layout: full-screen, no scrollbars, touch-optimized */
+        .page {
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 3rem 1rem 2rem;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+        .header .icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.02em;
+        }
+        .header p {
+            font-size: 0.9rem;
+            color: #a0a0b0;
+            margin-top: 0.4rem;
+        }
+
+        /* Project grid — optimized for touch targets on iPad */
+        .project-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 1rem;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        /* Individual project card */
+        .project-card {
+            background: #0a0a1a;
+            border: 2px solid #0f3460;
+            border-radius: 12px;
+            padding: 1.5rem 1rem;
+            text-align: center;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .project-card:active {
+            transform: scale(0.96);
+        }
+        .project-card:hover {
+            border-color: #53d8fb;
+            background: #0f1629;
+        }
+        .project-card .name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #53d8fb;
+            word-break: break-word;
+        }
+        .project-card .action {
+            font-size: 0.8rem;
+            color: #a0a0b0;
+            margin-top: 0.5rem;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #a0a0b0;
+        }
+        .empty-state .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .empty-state p {
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Create project card — dashed border */
+        .create-card {
+            border: 2px dashed #38879b;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100px;
+        }
+        .create-card:hover {
+            border-color: #53d8fb;
+            background: rgba(56, 135, 155, 0.08);
+        }
+        .create-card .plus {
+            font-size: 2rem;
+            color: #38879b;
+            line-height: 1;
+        }
+
+        /* New project modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #0a0a1a;
+            border: 1px solid #0f3460;
+            border-radius: 12px;
+            padding: 2rem;
+            width: 90%;
+            max-width: 380px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        }
+        .modal h2 {
+            font-size: 1.2rem;
+            color: #fff;
+            margin-bottom: 1.5rem;
+        }
+        .modal input {
+            width: 100%;
+            background: #0d1b36;
+            border: 1px solid #0f3460;
+            color: #e0e0e0;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            margin-bottom: 0.5rem;
+        }
+        .modal input:focus { outline: none; border-color: #53d8fb; }
+        .modal .hint {
+            font-size: 0.75rem;
+            color: #a0a0b0;
+            margin-bottom: 1.5rem;
+        }
+        .modal-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+        .modal-btn {
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .modal-btn.primary {
+            background: #38879b;
+            color: #fff;
+        }
+        .modal-btn.primary:hover { background: #2f7382; }
+        .modal-btn.secondary {
+            background: #0f3460;
+            color: #a0a0b0;
+        }
+        .modal-btn.secondary:hover { background: #1a4a8a; color: #fff; }
+        .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0a0a1a;
+            border: 1px solid #0f3460;
+            color: #e0e0e0;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            font-size: 0.9rem;
+        }
+        .toast.show { opacity: 1; }
+        .toast.success { border-color: #00b894; }
+        .toast.error { border-color: #e94560; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="header">
+            <div class="icon">📷</div>
+            <h1>Photobooth</h1>
+            <p>Select a project to capture</p>
+        </div>
+
+        <div class="project-grid">
+            <div class="project-card create-card" onclick="openCreateProject()" title="Create a new project">
+                <div class="plus">＋</div>
+            </div>
+
+            {{ if .Projects }}
+            {{ range .Projects }}
+            <a href="photobooth/{{ . }}" class="project-card">
+                <div class="name">{{ . }}</div>
+                <div class="action">Open camera</div>
+            </a>
+            {{ end }}
+            {{ end }}
+        </div>
+
+        {{ if not .Projects }}
+        <div class="empty-state">
+            <div class="icon">📷</div>
+            <p>No projects yet. Create one to get started.</p>
+        </div>
+        {{ end }}
+    </div>
+
+    <!-- New project modal -->
+    <div class="modal-overlay" id="newProjectModal">
+        <div class="modal">
+            <h2>New Project</h2>
+            <input type="text" id="newProjectName" placeholder="project-name" autocomplete="off" inputmode="lowercase">
+            <p class="hint">Letters, numbers, dots, dashes. Must start with a letter or number.</p>
+            <div class="modal-actions">
+                <button class="modal-btn primary" id="createBtn" onclick="submitCreateProject()">Create</button>
+                <button class="modal-btn secondary" onclick="closeCreateProject()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+    const __URL_PREFIX__ = '{{ .prefix }}';
+    function url(path) { return __URL_PREFIX__ + path; }
+
+    const modal = document.getElementById('newProjectModal');
+    const nameInput = document.getElementById('newProjectName');
+    const createBtn = document.getElementById('createBtn');
+
+    function openCreateProject() {
+        modal.classList.add('active');
+        nameInput.value = '';
+        setTimeout(() => nameInput.focus(), 100);
+    }
+
+    function closeCreateProject() {
+        modal.classList.remove('active');
+        createBtn.disabled = false;
+        createBtn.textContent = 'Create';
+    }
+
+    function submitCreateProject() {
+        const name = nameInput.value.trim();
+        if (!name) {
+            nameInput.focus();
+            return;
+        }
+        createBtn.disabled = true;
+        createBtn.textContent = 'Creating...';
+
+        fetch(url('/create-project'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name })
+        })
+        .then(r => {
+            if (r.ok) {
+                // Redirect to photobooth with the new project
+                const target = url('/photobooth/' + name);
+                window.location.href = target;
+            } else {
+                r.text().then(msg => showToast(msg || 'Create failed', 'error'));
+                createBtn.disabled = false;
+                createBtn.textContent = 'Create';
+            }
+        })
+        .catch(() => {
+            showToast('Create failed', 'error');
+            createBtn.disabled = false;
+            createBtn.textContent = 'Create';
+        });
+    }
+
+    // Close modal on overlay click
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeCreateProject();
+    });
+
+    // Enter/Escape keys
+    nameInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); submitCreateProject(); }
+        if (e.key === 'Escape') { e.preventDefault(); closeCreateProject(); }
+    });
+
+    function showToast(msg, type) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast show ' + (type || '');
+        setTimeout(() => { t.className = 'toast'; }, 3000);
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }}{{ if .Project }} — {{ .Project }}{{ end }}</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh}
+        .nav{background:#16213e;border-bottom:1px solid #0f3460;padding:0.75rem 1.5rem;display:flex;align-items:center;gap:1.5rem}
+        .nav a{color:#a0a0b0;text-decoration:none;font-size:0.9rem;padding:0.3rem 0.6rem;border-radius:4px}
+        .nav a:hover,.nav a.active{color:#e94560;background:rgba(233,69,96,0.1)}
+        .nav .logo{font-weight:700;font-size:1.1rem;color:#e94560;margin-right:auto}
+        .nav .project-name{color:#53d8fb;font-weight:600}
+        .container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+        .flash{background:#0f3460;border-left:4px solid #53d8fb;padding:0.75rem 1rem;margin-bottom:1.5rem;border-radius:0 4px 4px 0}
+        .flash.error{border-left-color:#e94560;background:rgba(233,69,96,0.1)}
+        h1{font-size:1.5rem;margin-bottom:1rem;color:#fff}
+        h2{font-size:1.2rem;margin-bottom:0.75rem;color:#ccc}
+        .card{background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem}
+        .btn{display:inline-block;background:#e94560;color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:4px;font-size:0.9rem;cursor:pointer;text-decoration:none}
+        .btn:hover{background:#c73652}.btn-secondary{background:#0f3460}.btn-secondary:hover{background:#1a4a8a}
+        .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-top:1rem}
+        .gallery-item{background:#16213e;border:1px solid #0f3460;border-radius:8px;overflow:hidden;text-decoration:none;color:inherit;transition:transform 0.2s,border-color 0.2s}
+        .gallery-item:hover{transform:translateY(-2px);border-color:#e94560}
+        .gallery-item img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+        .gallery-item .meta{padding:0.5rem;font-size:0.75rem;color:#a0a0b0}
+        .pagination{display:flex;gap:0.5rem;margin-top:1.5rem;justify-content:center}
+        .pagination a,.pagination span{padding:0.4rem 0.8rem;border-radius:4px;text-decoration:none;font-size:0.85rem}
+        .pagination a{background:#16213e;color:#a0a0b0;border:1px solid #0f3460}
+        .pagination a:hover{background:#0f3460;color:#fff}
+        .pagination .current{background:#e94560;color:#fff}
+        .element-detail{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
+        @media(max-width:768px){.element-detail{grid-template-columns:1fr}}
+        .element-detail img{width:100%;border-radius:8px;border:1px solid #0f3460}
+        .detail-meta{display:grid;gap:0.5rem}
+        .detail-meta .row{display:flex;gap:0.5rem}
+        .detail-meta .key{color:#a0a0b0;font-size:0.85rem;min-width:120px}
+        .detail-meta .value{color:#e0e0e0;font-size:0.85rem;word-break:break-word}
+        .prompt-text{background:#0d1b36;padding:0.75rem;border-radius:4px;font-size:0.9rem;line-height:1.5;border:1px solid #0f3460}
+        .status-queued{color:#53d8fb}.status-generating{color:#f39c12}.status-completed{color:#00b894}.status-failed{color:#e94560}
+        .empty-state{text-align:center;padding:3rem;color:#a0a0b0}
+        .btn-danger{background:#8b0000}.btn-danger:hover{background:#a50000}
+    </style>
+</head>
+<body>
+    <script>
+    window.__EXTENSIONS__ = { {{ range $i, $k := .EnabledExtensions }}{{ if $i }},{{ end }}"{{ $k }}": true{{ end }} };
+    </script>
+    <nav class="nav">
+        <a class="logo" href="{{ urlPath "/" }}">seedwright</a>
+        {{ if .Project }}
+        <span class="project-name">{{ .Project }}</span>
+        <a href="{{ urlPath (print "/basic/" .Project) }}" {{ if eq .Page "dashboard" }}class="active"{{ end }}>Dashboard</a>
+        <a href="{{ urlPath (print "/basic/" .Project "/gallery") }}" {{ if eq .Page "gallery" }}class="active"{{ end }}>Gallery</a>
+        <a href="{{ urlPath (print "/basic/" .Project "/external") }}" {{ if eq .Page "external" }}class="active"{{ end }}>Upload</a>
+        {{ if .NavItems }}{{ .NavItems | safeHTML }}{{ end }}
+        {{ else }}
+        <a href="{{ urlPath "/" }}" class="active">Home</a>
+        {{ end }}
+    </nav>
+    <div class="container">
+        {{ if .Flash }}<div class="flash">{{ .Flash }}</div>{{ end }}
+        {{ if .Error }}<div class="flash error">{{ .Error }}</div>{{ end }}
+
+        {{ if .Element.ID }}
+        <h1>Element Details</h1>
+        <div class="element-detail">
+            <div>
+                {{ if .Element.Image }}
+                <img src="{{ urlPath (print "/basic/" $.Project "/element/" .Element.ID "/image") }}" alt="Generated image">
+                {{ else }}
+                <div style="width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:#0d1b36;border-radius:8px;border:1px solid #0f3460;color:#a0a0b0;font-size:0.9rem;">Image not available — regenerate below</div>
+                {{ end }}
+            </div>
+            {{ if .Element.Generation }}
+            <div class="detail-meta">
+                <div class="row">
+                    <span class="key">Prompt</span>
+                    <span class="value"><div class="prompt-text">{{ escape .Element.Generation.Prompt }}</div></span>
+                </div>
+                {{ if .Element.Generation.NegativePrompt }}
+                <div class="row">
+                    <span class="key">Negative Prompt</span>
+                    <span class="value"><div class="prompt-text">{{ escape .Element.Generation.NegativePrompt }}</div></span>
+                </div>
+                {{ end }}
+                <div class="row">
+                    <span class="key">Seed</span>
+                    <span class="value">{{ .Element.Generation.Seed }}</span>
+                </div>
+                <div class="row">
+                    <span class="key">Dimensions</span>
+                    <span class="value">{{ .Element.Generation.Width }} × {{ .Element.Generation.Height }}</span>
+                </div>
+                <div class="row">
+                    <span class="key">Steps</span>
+                    <span class="value">{{ .Element.Generation.SampleSteps }}</span>
+                </div>
+                <div class="row">
+                    <span class="key">CFG Scale</span>
+                    <span class="value">{{ .Element.Generation.TxtCfg }}</span>
+                </div>
+                {{ if .Element.Generation.Model.Architecture }}
+                <div class="row">
+                    <span class="key">Model</span>
+                    <span class="value">{{ .Element.Generation.Model.Architecture }}
+                    {{ if .Element.Generation.Model.Variant }}/{{ .Element.Generation.Model.Variant }}{{ end }}
+                    {{ if .Element.Generation.Model.Params }}({{ .Element.Generation.Model.Params }}){{ end }}
+                    {{ if .Element.Generation.Model.Quantization }}[{{ .Element.Generation.Model.Quantization }}]{{ end }}
+                    {{ if .Element.Generation.Model.Name }} — {{ .Element.Generation.Model.Name }}{{ end }}</span>
+                </div>
+                {{ end }}
+                <div class="row">
+                    <span class="key">Created</span>
+                    <span class="value">{{ .Element.CreatedAt.Format "2006-01-02 15:04:05" }}</span>
+                </div>
+            </div>
+            {{ else }}
+            <div class="detail-meta">
+                <div class="row">
+                    <span class="key">Origin</span>
+                    <span class="value">{{ .Element.Origin }}</span>
+                </div>
+                <div class="row">
+                    <span class="key">Created</span>
+                    <span class="value">{{ .Element.CreatedAt.Format "2006-01-02 15:04:05" }}</span>
+                </div>
+            </div>
+            {{ end }}
+        </div>
+        <div style="margin-top:1.5rem;display:flex;gap:0.75rem;flex-wrap:wrap;">
+            <a href="{{ urlPath (print "/basic/" $.Project "/gallery") }}" class="btn btn-secondary">← Back to Gallery</a>
+            <button class="btn btn-secondary" onclick="addAsReference()">+ Add as Reference</button>
+            <button class="btn btn-secondary" onclick="reuseSettings()">⟳ Reuse Settings</button>
+            <a href="{{ urlPath (print "/basic/" $.Project) }}" class="btn btn-secondary">← Dashboard</a>
+            {{ if .Element.Image }}
+            <a href="{{ urlPath (print "/basic/" $.Project "/element/" .Element.ID "/image") }}" class="btn" download>Download Image</a>
+            {{ end }}
+        </div>
+        <div style="margin-top:1rem;display:flex;gap:1rem;flex-wrap:wrap;">
+            <button class="btn btn-secondary" onclick="regenerate('{{ $.Project }}', '{{ .Element.ID }}')">↻ Regenerate and replace</button>
+            <button class="btn" onclick="generateClone('{{ $.Project }}', '{{ .Element.ID }}')">↻ Generate Clone</button>
+        </div>
+        <div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <button class="btn btn-danger" onclick="deleteElement('{{ $.Project }}', '{{ .Element.ID }}')">🗑 Delete</button>
+        </div>
+        {{ if .ElementActions }}
+        <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+            {{ .ElementActions | safeHTML }}
+        </div>
+        {{ end }}
+        <script>
+        (function() {
+            var project = '{{ $.Project }}';
+            var elemId = '{{ .Element.ID }}';
+            var elem = JSON.parse({{ .ElementJSON | unsafeJSON }});
+            if (!elem) elem = {};
+
+            // Prefix-aware URL helper
+            var __URL_PREFIX__ = '{{ .prefix }}';
+            function url(path) { return __URL_PREFIX__ + path; }
+
+            window.toggleFavorite = function(_project, _elementId, btn) {
+                var isFav = btn.textContent.indexOf('⭐') !== -1;
+                btn.textContent = isFav ? '☆ Favorite' : '⭐ Favorite';
+
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', url('/api/' + _project + '/favorites/toggle'), true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        var data = JSON.parse(xhr.responseText);
+                        btn.textContent = (data.favorite ? '⭐' : '☆') + ' Favorite';
+                    } else {
+                        // Revert on failure
+                        btn.textContent = isFav ? '⭐ Favorite' : '☆ Favorite';
+                    }
+                };
+                xhr.send(JSON.stringify({element_id: _elementId}));
+            };
+
+            window.addAsReference = function() {
+                var refs = JSON.parse(localStorage.getItem('sdcpp_ref_' + project) || '[]');
+                if (refs.indexOf(elemId) === -1) {
+                    refs.push(elemId);
+                    localStorage.setItem('sdcpp_ref_' + project, JSON.stringify(refs));
+                }
+                alert('Added as reference — navigating to dashboard.');
+                window.location.href = url('/basic/' + project);
+            };
+
+            window.reuseSettings = function() {
+                // Collect reference image IDs from this element (if it was generated from refs).
+                var refIds = [];
+                if (elem.generation && elem.generation.reference_images) {
+                    for (var i = 0; i < elem.generation.reference_images.length; i++) {
+                        refIds.push(elem.generation.reference_images[i].element_id);
+                    }
+                }
+                var gen = elem.generation || {};
+                localStorage.setItem('sdcpp_reuse_' + project, JSON.stringify({
+                    prompt: gen.prompt || '',
+                    negative_prompt: gen.negative_prompt || '',
+                    width: gen.width || 512,
+                    height: gen.height || 512,
+                    steps: gen.sample_steps || 20,
+                    cfg: gen.txt_cfg || 7.0,
+                    seed: gen.seed || -1,
+                    reference_ids: refIds,
+                }));
+                window.location.href = url('/basic/' + project);
+            };
+
+            window.generateClone = function(_project, elementId) {
+                fetch(url('/api/' + _project + '/element/' + elementId + '/generate-clone'), { method: 'POST' })
+                    .then(r => {
+                        if (r.ok) {
+                            return r.json().then(data => {
+                                window.location.href = url('/basic/' + project + '/element/' + data.element_id);
+                            });
+                        } else {
+                            return r.text().then(msg => { alert('Generate Clone failed: ' + msg); });
+                        }
+                    })
+                    .catch(() => alert('Generate Clone failed'));
+            };
+
+            window.deleteElement = function(_project, elementId) {
+                if (!confirm('Delete this element? This will permanently remove the image, metadata, and all job records.')) return;
+                fetch(url('/api/' + _project + '/element/' + elementId + '/delete'), {
+                    method: 'POST',
+                    headers: {'Accept': 'application/json'}
+                })
+                    .then(r => {
+                        if (r.ok) {
+                            window.location.href = url('/basic/' + project + '/gallery');
+                        } else {
+                            return r.text().then(msg => { alert('Delete failed: ' + msg); });
+                        }
+                    })
+                    .catch(() => alert('Delete failed'));
+            };
+
+            window.regenerate = function(_project, elementId) {
+                fetch(url('/api/' + _project + '/element/' + elementId + '/regenerate-in-place'), { method: 'POST' })
+                    .then(r => {
+                        if (r.ok) {
+                            return r.json().then(data => {
+                                window.location.href = url('/basic/' + project + '/element/' + data.element_id);
+                            });
+                        } else {
+                            return r.text().then(msg => { alert('Regenerate and replace failed: ' + msg); });
+                        }
+                    })
+                    .catch(() => alert('Regenerate and replace failed'));
+            };
+        })();
+        </script>
+        {{ else }}
+        <div class="card">
+            <h2>Element not found</h2>
+            <p style="color:#a0a0b0;margin-top:0.5rem;">
+                The element you're looking for doesn't exist or hasn't been synced yet.
+            </p>
+            <a href="{{ urlPath (print "/basic/" $.Project "/gallery") }}" class="btn" style="margin-top:1rem;">← Back to Gallery</a>
+        </div>
+        {{ end }}
+    </div>
+</body>
+</html>

@@ -1,0 +1,127 @@
+# seedwright — Example Configuration
+#
+# A config file is OPTIONAL: without one, the app boots on first-run
+# defaults (ephemeral memory storage + http://127.0.0.1:1234) and the
+# onboarding wizard at /onboarding writes this file back for you.
+#
+# Copy this file to config.yaml and adjust the values for your environment.
+#
+# Usage:
+#   ./app                              # loads config.yaml from current directory
+#   ./app /etc/seedwright/config.yaml  # loads from a custom path
+
+# ─── Server ───────────────────────────────────────────────────────────────────
+server:
+  listen: ":8080"              # HTTP listen address (host:port)
+  path_prefix: ""              # Reverse-proxy subpath prefix (default "" = root)
+                               # e.g. "/sd" → all routes served at /sd/basic/..., /sd/api/...
+
+# ─── sdcpp Backends ──────────────────────────────────────────────────────────
+# Configure one or more sdcpp instances. Each project independently selects
+# which backend to use.
+sdcpp:
+  backends:
+    - name: "default"
+      base_url: "http://127.0.0.1:1234"  # Base URL of your sdcpp instance (conventional default)
+      architecture: "flux2"              # Model architecture — e.g. "flux2", "sd3", "sdxl"
+                                       # Used for metadata display; not validated by core
+
+# ─── Object Storage ──────────────────────────────────────────────────────────
+# Three backends: "memory" (ephemeral, default for a missing config file),
+# "file" (local folder), "s3" (S3-compatible).
+storage:
+  type: "s3"                       # Storage backend: "s3", "file", or "memory"
+
+  # S3 settings (required when type: "s3")
+  endpoint: "http://localhost:3900"  # S3-compatible endpoint URL (Garage, MinIO, AWS S3, etc.)
+  region: "garage"                  # S3 region (used for request signing)
+  bucket: "sdcpp-outputs"           # Bucket name (created automatically if absent)
+  access_key: ""                    # Access key ID — leave empty for anonymous access
+  secret_key: ""                    # Secret access key — leave empty for anonymous access
+  force_path_style: true            # Use path-style URLs (required for Garage/minio; false for AWS)
+
+  # Local filesystem settings (required when type: "file")
+  # file_path: "/data/sdcpp-outputs"  # Local directory for image and element storage
+
+  # Memory settings (type: "memory") — ephemeral, lost on restart,
+  # zero external setup (routers / OpenWrt / first run). The device is
+  # considered FULL after the capacity limit; nothing is evicted.
+  # capacity: "10MB"              # optional; default 10MB. Binary units: "512KB", "1GB", "2048B"
+
+# ─── SQLite Cache ────────────────────────────────────────────────────────────
+database:
+  sqlite_path: "cache.db"           # Path to the SQLite database file (rebuildable from S3)
+
+# ─── Application ─────────────────────────────────────────────────────────────
+application:
+  title: "seedwright"               # Title shown in the browser tab
+  default_project: "default"        # Name of the first project shown on the home page
+  onboarding: "joleuger/onboarding" # Setup wizard provider (default, also: absent).
+                                    # "none" disables the wizard; any other extension
+                                    # key selects a different onboarding extension.
+
+# ─── Extensions ──────────────────────────────────────────────────────────────
+# Each extension has an "enabled" flag (default: true).
+# Disabled extensions create no tables, register no routes, and fire no hooks.
+#
+# Key format: extensions.owner/name
+#
+# Bundled extensions:
+#   joleuger/batch              — Sequential multi-seed generation
+#   joleuger/favorites          — Element bookmarking
+#   joleuger/imageproc          — Image-processing engine (gm) for print crop canvases
+#   joleuger/onboarding         — First-run setup wizard + Customize page (writes config.yaml)
+#   joleuger/photobooth         — Fullscreen camera capture
+#   joleuger/printer            — CUPS print API (requires joleuger/imageproc)
+#   joleuger/slideshow          — Fullscreen gallery slideshow (plays the active gallery filters)
+#   joleuger/console_code_authorizer — Console-code control-plane authorizer
+#
+# Global extension config (per-extension defaults are applied when the block
+# is absent; per-project settings are stored in S3 delta files).
+#
+# Example:
+# extensions:
+#   joleuger/batch:
+#     enabled: true
+#     max_concurrent: 1
+#     poll_interval: 2s
+#   joleuger/favorites:
+#     enabled: true
+#   joleuger/onboarding:
+#     enabled: true
+#     allow_config_write: false   # default — let the wizard OVERWRITE an existing
+#                                 # config.yaml; a missing file is always writable.
+#                                 # Needs a restart to take effect.
+#   joleuger/photobooth:
+#     enabled: true
+#   joleuger/slideshow:
+#     enabled: true
+#   joleuger/imageproc:
+#     enabled: true
+#     engine: "gm"                  # "gm" (default) | "none" (passthrough)
+#   joleuger/printer:
+#     enabled: false
+#     rotate: "auto"                # "auto" (default) | "never" — crop printers only
+#     printers:
+#       - name: "office"
+#         uri: "cups://localhost:631/printers/office"   # raw: prints as-is
+#       - name: "dyesub"
+#         uri: "cups://printserver.local/printers/dyesub"
+#         crop: true                # center-crop onto the print canvas via imageproc
+#         dimensions: "1800x1200"   # optional "WxH"; default canvas 1800x1200
+#     default_printer: "office"
+
+# ─── Authorization (v4) ──────────────────────────────────────────────────────
+# Auth is always enabled. Core provides a StaticEnforcer (single-principal
+# allow/deny). For full RBAC, enable the authz-simple extension (see above)
+# and set engine: "ext/joleuger/authz-simple".
+#
+# The control-plane authorizer handles the "bootstrapping paradox" — how a
+# principal gets into the data plane's bookkeeping in the first place when
+# the literal "user:root" is no longer reachable. See docs/AUTHORIZATION_V4.md.
+#
+# auth:
+#   mechanism: "static"          # Identity resolver: "static" (v1 only)
+#   engine: "static"             # Enforcer: "static" or extension key
+#   principal: "user:root"       # Fixed principal identity
+#   control_plane: "ext/joleuger/console_code_authorizer"  # Control-plane authorizer key (default: DenyAllAuthorizer)

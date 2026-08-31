@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }}</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh}
+        .nav{background:#16213e;border-bottom:1px solid #0f3460;padding:0.75rem 1.5rem;display:flex;align-items:center;gap:1.5rem}
+        .nav a{color:#a0a0b0;text-decoration:none;font-size:0.9rem;padding:0.3rem 0.6rem;border-radius:4px}
+        .nav a:hover,.nav a.active{color:#e94560;background:rgba(233,69,96,0.1)}
+        .nav .logo{font-weight:700;font-size:1.1rem;color:#e94560;margin-right:auto}
+        .nav select{background:#0d1b36;border:1px solid #0f3460;color:#e0e0e0;padding:0.3rem 0.6rem;border-radius:4px;font-size:0.85rem}
+        .nav select:focus{outline:none;border-color:#53d8fb}
+        .container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+        .flash{background:#0f3460;border-left:4px solid #53d8fb;padding:0.75rem 1rem;margin-bottom:1.5rem;border-radius:0 4px 4px 0}
+        .flash.error{border-left-color:#e94560;background:rgba(233,69,96,0.1)}
+        h1{font-size:1.5rem;margin-bottom:1rem;color:#fff}
+        h2{font-size:1.2rem;margin-bottom:0.75rem;color:#ccc}
+        .card{background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem}
+        .btn{display:inline-block;background:#e94560;color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:4px;font-size:0.9rem;cursor:pointer;text-decoration:none}
+        .btn:hover{background:#c73652}.btn-secondary{background:#0f3460}.btn-secondary:hover{background:#1a4a8a}
+        label{display:block;font-size:0.85rem;color:#a0a0b0;margin-bottom:0.3rem}
+        input,textarea,select{width:100%;background:#0d1b36;border:1px solid #0f3460;color:#e0e0e0;padding:0.5rem 0.75rem;border-radius:4px;font-size:0.9rem;font-family:inherit}
+        input:focus,textarea:focus,select:focus{outline:none;border-color:#53d8fb}
+        textarea{resize:vertical;min-height:80px}
+        .form-group{margin-bottom:1rem}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+        .form-row.three{grid-template-columns:1fr 1fr 1fr}
+        .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-top:1rem}
+        .gallery-item{background:#16213e;border:1px solid #0f3460;border-radius:8px;overflow:hidden;text-decoration:none;color:inherit;transition:transform 0.2s,border-color 0.2s}
+        .gallery-item:hover{transform:translateY(-2px);border-color:#e94560}
+        .gallery-item img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+        .gallery-item .meta{padding:0.5rem;font-size:0.75rem;color:#a0a0b0}
+        .pagination{display:flex;gap:0.5rem;margin-top:1.5rem;justify-content:center}
+        .pagination a,.pagination span{padding:0.4rem 0.8rem;border-radius:4px;text-decoration:none;font-size:0.85rem}
+        .pagination a{background:#16213e;color:#a0a0b0;border:1px solid #0f3460}
+        .pagination a:hover{background:#0f3460;color:#fff}
+        .pagination .current{background:#e94560;color:#fff}
+        .element-detail{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
+        @media(max-width:768px){.element-detail{grid-template-columns:1fr}.form-row,.form-row.three{grid-template-columns:1fr}}
+        .element-detail img{width:100%;border-radius:8px;border:1px solid #0f3460}
+        .detail-meta{display:grid;gap:0.5rem}
+        .detail-meta .row{display:flex;gap:0.5rem}
+        .detail-meta .key{color:#a0a0b0;font-size:0.85rem;min-width:120px}
+        .detail-meta .value{color:#e0e0e0;font-size:0.85rem;word-break:break-word}
+        .prompt-text{background:#0d1b36;padding:0.75rem;border-radius:4px;font-size:0.9rem;line-height:1.5;border:1px solid #0f3460}
+        .status-queued{color:#53d8fb}.status-generating{color:#f39c12}.status-completed{color:#00b894}.status-failed{color:#e94560}
+        .empty-state{text-align:center;padding:3rem;color:#a0a0b0}
+        .welcome-projects{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-top:1.5rem}
+        .welcome-project-card{display:block;background:#16213e;border:2px solid #0f3460;border-radius:8px;padding:1.5rem;text-align:center;text-decoration:none;color:inherit;transition:all 0.2s;cursor:pointer;position:relative}
+        .welcome-project-card:hover{border-color:#53d8fb;transform:translateY(-2px)}
+        .welcome-project-card .name{font-size:1.1rem;font-weight:600;color:#53d8fb}
+        .welcome-project-card .count{font-size:0.85rem;color:#a0a0b0;margin-top:0.5rem}
+        .new-project-card{border:2px dashed #53d8fb;background:transparent;display:flex;align-items:center;justify-content:center;min-height:120px}
+        .new-project-card:hover{border-color:#e94560;background:rgba(233,69,96,0.05)}
+        .new-project-card .name{font-size:1.3rem}
+        .welcome-project-card-wrapper{position:relative;display:inline-block;width:100%}
+        .settings-btn{position:absolute;top:-0.6rem;right:-0.6rem;background:none;border:none;color:#a0a0b0;font-size:1rem;cursor:pointer;padding:0.2rem 0.4rem;border-radius:4px}
+        .settings-btn:hover{color:#e94560;background:rgba(233,69,96,0.1)}
+        .settings-btn.hidden{color:#e94560}
+        /* Modal */
+        .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;justify-content:center;align-items:center}
+        .modal-overlay.active{display:flex}
+        .modal{background:#16213e;border:1px solid #0f3460;border-radius:12px;padding:2rem;width:90%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+        .modal h2{margin-bottom:1.5rem;color:#fff}
+        .modal-actions{display:flex;flex-direction:column;gap:0.75rem;margin-top:1.5rem}
+        .modal .btn{width:100%;text-align:center}
+        .modal-close{position:absolute;top:1rem;right:1rem;background:none;border:none;color:#a0a0b0;font-size:1.3rem;cursor:pointer}
+        .modal-close:hover{color:#fff}
+        /* Toast */
+        .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#16213e;border:1px solid #0f3460;color:#e0e0e0;padding:0.75rem 1.5rem;border-radius:8px;z-index:2000;opacity:0;transition:opacity 0.3s;pointer-events:none}
+        .toast.show{opacity:1}
+        .toast.success{border-color:#00b894}
+        .toast.error{border-color:#e94560}
+    </style>
+</head>
+<body>
+    <script>
+    window.__EXTENSIONS__ = { {{ range $i, $k := .EnabledExtensions }}{{ if $i }},{{ end }}"{{ $k }}": true{{ end }} };
+    </script>
+    <nav class="nav">
+        <a class="logo" href="{{ urlPath "/" }}">seedwright</a>
+        <a href="{{ urlPath "/" }}" class="active">Home</a>
+        {{ if .BackendNames }}
+        <select id="backendSelect" title="Select sdcpp backend">
+            {{ range .BackendNames }}
+            <option value="{{ . }}" {{ if eq . $.DefaultBackend }}selected{{ end }}>{{ . }}</option>
+            {{ end }}
+        </select>
+        {{ end }}
+    </nav>
+    <div class="container">
+        {{ if .Flash }}<div class="flash">{{ .Flash }}</div>{{ end }}
+        {{ if .Error }}<div class="flash error">{{ .Error }}</div>{{ end }}
+
+        <h1>Welcome to seedwright</h1>
+        <p style="color: #a0a0b0; margin-bottom: 1.5rem;">Select a project to get started.</p>
+        <div class="welcome-projects">
+            <div class="welcome-project-card new-project-card" onclick="openNewProject()" title="Create a new project">
+                <div class="name" style="color: #e94560;">＋ New Project</div>
+                <div class="count">Create project</div>
+            </div>
+            {{ if .Projects }}
+            {{ range .Projects }}
+            <div class="welcome-project-card-wrapper">
+                <a href="{{ urlPath (print "/basic/" .) }}" class="welcome-project-card">
+                    <div class="name">{{ . }}</div>
+                    <div class="count">Open project</div>
+                </a>
+                <a href="{{ urlPath (print "/basic/" . "/settings") }}" class="settings-btn" title="Project settings">⚙</a>
+            </div>
+            {{ end }}
+            {{ end }}
+        </div>
+
+        {{ if .WelcomeExtras }}
+        <div class="welcome-extras" style="margin-top:1.5rem">{{ .WelcomeExtras }}</div>
+        {{ end }}
+    </div>
+
+    <!-- New Project Modal -->
+    <div class="modal-overlay" id="newProjectModal">
+        <div class="modal" style="position:relative;">
+            <button class="modal-close" onclick="closeNewProject()">×</button>
+            <h2>Create New Project</h2>
+            <div class="form-group">
+                <label for="newProjectName">Project name</label>
+                <input type="text" id="newProjectName" placeholder="e.g. my-awesome-project" autocomplete="off">
+                <p style="font-size:0.75rem;color:#a0a0b0;margin-top:0.3rem">Letters, numbers, dots, dashes, underscores. Must start with a letter or number.</p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="submitNewProject()">Create</button>
+                <button class="btn btn-secondary" onclick="closeNewProject()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+    // Prefix-aware URL helper
+    var __URL_PREFIX__ = '{{ .prefix }}';
+    function url(path) { return __URL_PREFIX__ + path; }
+
+    // Global backend switcher
+    document.getElementById('backendSelect').addEventListener('change', function() {
+        fetch(url('/switch-backend'), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({backend: this.value})
+        });
+    });
+
+    // New Project Modal
+    function openNewProject() {
+        document.getElementById('newProjectModal').classList.add('active');
+        const input = document.getElementById('newProjectName');
+        input.value = '';
+        setTimeout(() => input.focus(), 100);
+    }
+
+    function closeNewProject() {
+        document.getElementById('newProjectModal').classList.remove('active');
+    }
+
+    function submitNewProject() {
+        const name = document.getElementById('newProjectName').value.trim();
+        if (!name) {
+            showToast('Please enter a project name', 'error');
+            return;
+        }
+        fetch(url('/create-project'), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name})
+        })
+        .then(r => {
+            if (r.ok) {
+                showToast('Project created', 'success');
+                closeNewProject();
+                setTimeout(() => location.reload(), 500);
+            } else {
+                r.text().then(msg => showToast(msg || 'Create failed', 'error'));
+            }
+        })
+        .catch(() => showToast('Create failed', 'error'));
+    }
+
+    // Close new project modal on overlay click
+    document.getElementById('newProjectModal').addEventListener('click', function(e) {
+        if (e.target === this) closeNewProject();
+    });
+
+    // Enter key submits the form
+    document.getElementById('newProjectName').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); submitNewProject(); }
+        if (e.key === 'Escape') { e.preventDefault(); closeNewProject(); }
+    });
+
+    function showToast(msg, type) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast show ' + (type || '');
+        setTimeout(() => { t.className = 'toast'; }, 3000);
+    }
+    </script>
+</body>
+</html>

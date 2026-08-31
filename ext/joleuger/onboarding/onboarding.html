@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --card: #16213e; --border: #0f3460;
+    --accent: #e94560; --link: #53d8fb;
+    --text: #e0e0e8; --muted: #a0a0b0;
+    --ok: #4ade80; --err: #f87171; --warnbg: #3a2e12; --warntx: #f5d76e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+  a { color: var(--link); }
+  h1 { margin: 0.25rem 0; font-size: 1.5rem; }
+  h2 { margin: 0 0 0.75rem; font-size: 1.05rem; color: var(--link); }
+  h3 { margin: 0 0 0.4rem; font-size: 0.98rem; }
+  .sub { color: var(--muted); margin: 0.25rem 0 1rem; }
+  .back { font-size: 0.85rem; text-decoration: none; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+          padding: 1.1rem 1.25rem; margin: 1rem 0; }
+  .card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .sect { font-size: 1.15rem; margin: 1.8rem 0 0.5rem; }
+  .status-row { display: flex; gap: 0.6rem; align-items: baseline; padding: 0.3rem 0; }
+  .status-row .k { min-width: 9rem; color: var(--muted); font-size: 0.88rem; }
+  .status-row .v { font-size: 0.92rem; }
+  .v.ok { color: var(--ok); } .v.err { color: var(--err); }
+  .warn { background: var(--warnbg); border: 1px solid #8a6d1a; color: var(--warntx);
+          border-radius: 6px; padding: 0.55rem 0.8rem; font-size: 0.85rem; margin: 0.6rem 0 0; }
+  label.f { display: block; margin: 0.7rem 0 0.2rem; color: var(--muted); font-size: 0.85rem; }
+  input[type=text], input[type=password], input[type=number], textarea, select {
+    width: 100%; background: #111a30; color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0.5rem 0.6rem; font: inherit; }
+  textarea { resize: vertical; }
+  .radio-row { display: flex; gap: 1.25rem; flex-wrap: wrap; margin: 0.5rem 0; }
+  .radio-row label { display: flex; gap: 0.4rem; align-items: center; font-size: 0.92rem; cursor: pointer; }
+  .hint { color: var(--muted); font-size: 0.8rem; margin-top: 0.15rem; }
+  .check { display: flex; gap: 0.4rem; align-items: center; margin-top: 0.5rem; font-size: 0.88rem; }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 6px;
+           padding: 0.5rem 1rem; font: inherit; font-weight: 600; cursor: pointer; margin-top: 0.9rem; }
+  button:hover { filter: brightness(1.1); }
+  button.secondary { background: transparent; border: 1px solid var(--border); color: var(--link); font-weight: 400; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+  .btnrow { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
+  .btnrow button { margin-top: 0.9rem; }
+  .result { display: none; margin-top: 0.7rem; font-size: 0.9rem; }
+  .result.ok { display: block; color: var(--ok); }
+  .result.err { display: block; color: var(--err); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 0.9rem; }
+  .grid .card { margin: 0; }
+  .customize-box { margin: 0.9rem 0 0; padding: 0.6rem 0.85rem; border: 1px dashed var(--border);
+                   border-radius: 8px; font-size: 0.88rem; color: var(--muted); }
+  pre.cfgpreview { background: #111a30; border: 1px solid var(--border); border-radius: 6px;
+               padding: 0.75rem; font-size: 0.78rem; white-space: pre-wrap; word-break: break-word;
+               max-height: 22rem; overflow: auto; min-height: 5rem; margin-top: 0.6rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="{{.prefix}}/basic/">← Back to projects</a>
+  <h1>✨ Setup &amp; Customize</h1>
+  <p class="sub">Pick a starting point, point it at your storage and sdcpp — then preview the config file: write it, or download it.</p>
+
+  <!-- Current setup -->
+  <section class="card">
+    <h2>Current setup</h2>
+    <div class="status-row">
+      <span class="k">Config file</span>
+      <span class="v {{if .State.ConfigFileExists}}ok{{else}}err{{end}}">
+        {{if .State.ConfigFileExists}}✔ {{.State.ConfigPath}}{{else}}not present — running on first-run defaults (memory storage){{end}}
+      </span>
+    </div>
+    <div class="status-row">
+      <span class="k">Storage</span>
+      <span class="v {{if .State.StorageOK}}ok{{else}}err{{end}}">
+        {{if .State.StorageOK}}✔ {{.State.StorageDetail}}{{else}}✖ {{.State.StorageDetail}}{{end}}
+      </span>
+    </div>
+    <div class="status-row">
+      <span class="k">Backend: {{.State.BackendName}}</span>
+      <span class="v {{if .State.BackendOK}}ok{{else}}err{{end}}">
+        {{if .State.BackendOK}}✔ {{.State.BackendDetail}}{{else}}✖ {{.State.BackendDetail}}{{end}}
+      </span>
+    </div>
+    <div class="status-row">
+      <span class="k">Config write</span>
+      <span class="v {{if or (not .State.ConfigFileExists) .State.AllowConfigWrite}}ok{{else}}err{{end}}">
+        {{.State.ConfigWriteDetail}}
+      </span>
+    </div>
+    {{if .State.EphemeralWarning}}
+    <div class="warn">⚠️ {{.State.EphemeralWarning}}</div>
+    {{end}}
+  </section>
+
+  <!-- Step 0: what do you want — profiles -->
+  <h2 class="sect">What do you actually want?</h2>
+  <p class="sub">
+    Pick a starting point. A profile sets the app title and which extensions are on —
+    storage and sdcpp are still yours to point at below.
+  </p>
+  <div class="grid">
+    {{range .State.Profiles}}
+    <div class="card profile-card" data-key="{{.Key}}" data-title="{{.Title}}">
+      <h3>{{.Title}}</h3>
+      <p class="sub" style="margin-bottom:0.5rem">{{.Blurb}}</p>
+      <button class="secondary" onclick="applyProfile('{{.Key}}', this)">Use this profile</button>
+      <div class="result" id="profResult_{{.Key}}"></div>
+    </div>
+    {{end}}
+  </div>
+  <div class="customize-box">
+    📖 Want something else? Scenarios, copy-paste prompts for a coding agent
+    (including how to fork this app down to the 5% you need), and everything
+    else you can customize are all described in
+    <a href="https://github.com/joleuger/seedwright/blob/main/CUSTOMIZE.md" target="_blank" rel="noopener">CUSTOMIZE.md</a>.
+  </div>
+
+  <!-- Step 1: storage -->
+  <section class="card">
+    <h2>1 · Where do your images live?</h2>
+    <div class="radio-row">
+      <label><input type="radio" name="storage_type" value="memory" {{if eq .State.StorageType "memory"}}checked{{end}}> Memory
+        <span class="hint" style="display:inline">(ephemeral, 10 MB, lost on restart — zero setup)</span></label>
+      <label><input type="radio" name="storage_type" value="file" {{if eq .State.StorageType "file"}}checked{{end}}> Local folder</label>
+      <label><input type="radio" name="storage_type" value="s3" {{if eq .State.StorageType "s3"}}checked{{end}}> S3 bucket</label>
+    </div>
+
+    <div id="fieldsMemory">
+      <label class="f" for="memCap">Capacity limit (the device is "full" after this)</label>
+      <input type="text" id="memCap" value="10MB" placeholder="10MB — also: 512KB, 1GB, 2048B">
+      <p class="hint">Binary units. Perfect for routers (OpenWrt) and trying things out.</p>
+    </div>
+    <div id="fieldsFile">
+      <label class="f" for="filePath">Folder path</label>
+      <input type="text" id="filePath" value="./storage" placeholder="./storage">
+    </div>
+    <div id="fieldsS3">
+      <label class="f" for="s3Endpoint">Endpoint</label>
+      <input type="text" id="s3Endpoint" placeholder="https://s3.example.com">
+      <label class="f" for="s3Region">Region</label>
+      <input type="text" id="s3Region" placeholder="us-east-1">
+      <label class="f" for="s3Bucket">Bucket</label>
+      <input type="text" id="s3Bucket" placeholder="family-photos">
+      <label class="f" for="s3AccessKey">Access key <span class="hint">(optional — env/anonymous may suffice)</span></label>
+      <input type="text" id="s3AccessKey">
+      <label class="f" for="s3SecretKey">Secret key</label>
+      <input type="password" id="s3SecretKey">
+      <label class="check"><input type="checkbox" id="s3PathStyle"> Path-style URLs (MinIO, LocalStack)</label>
+    </div>
+
+    <button class="secondary" onclick="verifyStorage()">Verify storage</button>
+    <div class="result" id="storageResult"></div>
+  </section>
+
+  <!-- Step 2: backend -->
+  <section class="card">
+    <h2>2 · Where does sdcpp run?</h2>
+    <label class="f" for="backendUrl">sdcpp base URL (the conventional default is shown)</label>
+    <input type="text" id="backendUrl" value="{{.State.BackendURL}}" placeholder="http://127.0.0.1:1234">
+    <label class="f" for="backendArch">Architecture <span class="hint">(optional — only if sdcpp was built for a specific one)</span></label>
+    <input type="text" id="backendArch" value="{{.State.BackendArch}}" placeholder="auto">
+    <p class="hint" style="margin-top:0.8rem">
+      Documentation:
+      <a href="https://github.com/joleuger/vuinputd/blob/main/docs/USAGE.md#installing-on-linux" target="_blank" rel="noopener">install sdcpp on Linux</a> ·
+      <a href="https://github.com/joleuger/vuinputd/blob/main/docs/USAGE.md#installing-on-windows" target="_blank" rel="noopener">Windows</a> ·
+      <a href="https://github.com/joleuger/vuinputd/blob/main/docs/USAGE.md#model-selection" target="_blank" rel="noopener">model selection</a>
+    </p>
+    <button class="secondary" onclick="verifyBackend()">Verify backend</button>
+    <div class="result" id="backendResult"></div>
+  </section>
+
+  <!-- Step 3: identity -->
+  <section class="card">
+    <h2>3 · Name it</h2>
+    <label class="f" for="appTitle">App title (shown in the header)</label>
+    <input type="text" id="appTitle" value="{{.State.Title}}" placeholder="Seedwright">
+    <label class="f" for="projectName">First project</label>
+    <input type="text" id="projectName" value="{{.State.ProjectName}}" placeholder="default">
+  </section>
+
+  <!-- Config preview -->
+  <section class="card">
+    <h2>Config preview</h2>
+    <p class="sub">
+      What would be written to <code>{{.State.ConfigPath}}</code>.
+      Secrets from your current config (S3 keys) are masked — use Download for the real file.
+    </p>
+    <pre class="cfgpreview" id="cfgPreview">…</pre>
+    <label class="check" id="confirmRow" style="display:none">
+      <input type="checkbox" id="confirmOverwrite">
+      I understand this overwrites the existing config file (sections the wizard doesn't touch are preserved).
+    </label>
+    <div class="btnrow">
+      <button class="secondary" onclick="updatePreview()">Update preview</button>
+      <button id="writeBtn" onclick="writeConfig()">Write config file</button>
+      <button class="secondary" onclick="downloadConfig()">Download config file</button>
+    </div>
+    <div class="result" id="previewResult"></div>
+    <p class="hint">A restart applies the config — there is no way around that, and the app will tell you so.</p>
+  </section>
+
+</div>
+
+<script>
+const ONBOARDING = {{.OnboardingJS}};
+const P = ONBOARDING.prefix;
+let selectedProfile = "";
+
+function val(id) { const el = document.getElementById(id); return el ? el.value.trim() : ""; }
+
+function setResult(id, ok, text) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = "result " + (ok ? "ok" : "err");
+}
+
+async function post(url, body) {
+  const r = await fetch(P + url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return r.json();
+}
+
+function storageFields() {
+  const type = document.querySelector('input[name="storage_type"]:checked').value;
+  return {
+    storage_type: type,
+    memory_capacity: type === "memory" ? val("memCap") : "",
+    file_path: type === "file" ? val("filePath") : "",
+    endpoint: type === "s3" ? val("s3Endpoint") : "",
+    region: type === "s3" ? val("s3Region") : "",
+    bucket: type === "s3" ? val("s3Bucket") : "",
+    access_key: type === "s3" ? val("s3AccessKey") : "",
+    secret_key: type === "s3" ? val("s3SecretKey") : "",
+    force_path_style: type === "s3" && document.getElementById("s3PathStyle").checked,
+  };
+}
+
+// The wizard's full payload (storage + backend + identity + profile).
+function wizardBody() {
+  return Object.assign(storageFields(), {
+    backend_url: val("backendUrl"),
+    backend_architecture: val("backendArch"),
+    title: val("appTitle"),
+    project_name: val("projectName"),
+    profile_key: selectedProfile,
+  });
+}
+
+async function verifyStorage() {
+  const res = await post("/api/onboarding/verify", Object.assign({ target: "storage" }, storageFields()));
+  setResult("storageResult", res.ok, res.detail || res.error);
+}
+
+async function verifyBackend() {
+  const res = await post("/api/onboarding/verify", { target: "backend", url: val("backendUrl") });
+  setResult("backendResult", res.ok, res.detail || res.error);
+}
+
+function updateWriteUI(res) {
+  const wb = document.getElementById("writeBtn");
+  wb.disabled = !res.write_allowed;
+  document.getElementById("confirmRow").style.display = res.confirm_required ? "" : "none";
+  if (res.write_allowed) {
+    setResult("previewResult", true, res.confirm_required
+      ? "Preview ready — tick the box, then Write. Or Download the file instead."
+      : "Preview ready — Write it, or Download the file instead.");
+  } else {
+    setResult("previewResult", false, "Preview only — " + res.write_blocked_reason);
+  }
+}
+
+async function updatePreview() {
+  const res = await post("/api/onboarding/preview", wizardBody());
+  if (!res.ok) {
+    setResult("previewResult", false, res.error);
+    return;
+  }
+  document.getElementById("cfgPreview").textContent = res.yaml;
+  updateWriteUI(res);
+}
+
+async function writeConfig() {
+  const body = wizardBody();
+  body.confirm_overwrite = document.getElementById("confirmOverwrite").checked;
+  const res = await post("/api/onboarding/complete", body);
+  setResult("previewResult", res.ok, res.message || res.error);
+  if (res.ok) {
+    document.getElementById("writeBtn").disabled = true;
+    document.getElementById("confirmRow").style.display = "none";
+  }
+}
+
+async function downloadConfig() {
+  const r = await fetch(P + "/api/onboarding/download", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(wizardBody()),
+  });
+  if (!r.ok) {
+    let msg = "download failed (HTTP " + r.status + ")";
+    try {
+      const j = await r.json();
+      if (j.error) msg = j.error;
+    } catch (e) {}
+    setResult("previewResult", false, msg);
+    return;
+  }
+  const blob = await r.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "config.yaml";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+  setResult("previewResult", true, "Downloaded config.yaml — put it where your app expects its config, then restart.");
+}
+
+// Select a profile: highlight it, pre-fill the title, include it in
+// every subsequent preview/write/download. When the running config
+// allows writing, the profile is also applied to the file immediately.
+async function applyProfile(key, btn) {
+  selectedProfile = key;
+  let card = btn ? btn.closest(".profile-card") : null;
+  if (!card) card = document.querySelector('.profile-card[data-key="' + key + '"]');
+  document.querySelectorAll(".profile-card.selected").forEach(function (c) { c.classList.remove("selected"); });
+  if (card) card.classList.add("selected");
+  if (card && card.dataset.title) {
+    document.getElementById("appTitle").value = card.dataset.title;
+  }
+  if (ONBOARDING.writeAllowed) {
+    const res = await post("/api/onboarding/profile", { key: key });
+    setResult("profResult_" + key, res.ok, res.message || res.error);
+  } else {
+    setResult("profResult_" + key, true, "Selected — it will be included when you Write or Download the config.");
+  }
+  updatePreview();
+}
+
+// Show the field group for the selected storage type.
+function toggleStorageFields() {
+  const type = document.querySelector('input[name="storage_type"]:checked').value;
+  document.getElementById("fieldsMemory").style.display = type === "memory" ? "" : "none";
+  document.getElementById("fieldsFile").style.display = type === "file" ? "" : "none";
+  document.getElementById("fieldsS3").style.display = type === "s3" ? "" : "none";
+}
+document.querySelectorAll('input[name="storage_type"]').forEach(function (r) {
+  r.addEventListener("change", toggleStorageFields);
+});
+toggleStorageFields();
+
+// Initial preview: show the config the wizard would produce right now.
+updatePreview();
+</script>
+</body>
+</html>

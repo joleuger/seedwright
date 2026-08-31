@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ .Title }} — {{ .Project }} — seedwright</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Fira Code',Consolas,monospace;background:#121218;color:#d0d0d8;padding:2rem}
+        h1{color:#e0e0e8;margin-bottom:.5rem}
+        a{color:#7eb8f7;text-decoration:none}
+        a:hover{color:#a0cfff}
+        .card{background:#1e1e2a;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem;border:1px solid #2a2a3a}
+        .card h3{color:#c0c0c8;margin-bottom:.75rem}
+        .status-queued{color:#a080d0}.status-generating{color:#d0a050}
+        .status-completed{color:#50b050}.status-failed{color:#d05050}
+        .status-cancelled{color:#a0a0a0}.status-pending{color:#808090}
+        .seed{color:#8080a0;font-size:.9em}
+        .nav{margin-bottom:1.5rem}
+        .nav a{margin-right:1rem}
+        table{width:100%;border-collapse:collapse}
+        th,td{text-align:left;padding:.5rem .75rem;border-bottom:1px solid #2a2a3a}
+        th{color:#a0a0b0;font-weight:400}
+        td{color:#d0d0d8}
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="{{ urlPath (print "/basic/" .Project) }}">← Back to {{ .Project }}</a>
+    </div>
+
+    <div class="card">
+        <h1>{{ .Batch.Prompt }}</h1>
+        <p style="color:#8080a0;margin-bottom:1rem">
+            {{ .Project }} &middot; {{ len .Items }} items &middot;
+            Created {{ .Batch.CreatedAt.Format "2006-01-02 15:04:05" }}
+        </p>
+        <p>
+            Status: <span class="status-{{ .Batch.Status }}">{{ .Batch.Status }}</span>
+        </p>
+        <p class="seed">
+            {{ if gt .Batch.Width 0 }}{{ .Batch.Width }}x{{ .Batch.Height }} {{ end }}
+            {{ if gt .Batch.SampleSteps 0 }}{{ .Batch.SampleSteps }} steps {{ end }}
+            CFG {{ if gt .Batch.TxtCfg 0 }}{{ printf "%.1f" .Batch.TxtCfg }}{{ end }}
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>Items</h3>
+        <table>
+            <thead>
+                <tr><th>#</th><th>Seed</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+                {{ range $i, $item := .Items }}
+                <tr>
+                    <td>{{ $item.Position }}</td>
+                    <td><code>{{ $item.Seed }}</code></td>
+                    <td><span class="status-{{ $item.Status }}">{{ $item.Status }}</span></td>
+                    <td>
+                        {{ if and $item.ElementID (eq $item.Status "completed") }}
+                            <a href="{{ urlPath (print "/basic/" $.Project "/element/" $item.ElementID) }}">view</a>
+                        {{ end }}
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+    (function() {
+        var BATCH_ID = '{{ .Batch.ID }}';
+        var PROJECT = '{{ .Project }}';
+        var POLL_MS = 2000;
+
+        // Prefix-aware URL helper
+        var __URL_PREFIX__ = '{{ .prefix }}';
+        function url(path) { return __URL_PREFIX__ + path; }
+
+        function refreshBatch() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url('/api/' + PROJECT + '/batch/' + BATCH_ID + '/api'), true);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    updateUI(data);
+                }
+            };
+            xhr.send();
+        }
+
+        function updateUI(data) {
+            // Update batch status
+            var statusEl = document.querySelector('.status-' + data.batch_status);
+            if (statusEl) {
+                statusEl.textContent = data.batch_status;
+                // Remove old status class, add new
+                statusEl.className = 'status-' + data.batch_status;
+            }
+
+            // Update item statuses
+            var rows = document.querySelectorAll('tbody tr');
+            rows.forEach(function(row, idx) {
+                if (data.items && idx < data.items.length) {
+                    var statusCell = row.cells[2];
+                    var item = data.items[idx];
+                    statusCell.innerHTML = '<span class="status-' + item.status + '">' + item.status + '</span>';
+                    var linkCell = row.cells[3];
+                    if (item.status === 'completed' && item.element_id) {
+                        linkCell.innerHTML = '<a href="' + url('/basic/' + PROJECT + '/element/' + item.element_id) + '">view</a>';
+                    } else {
+                        linkCell.innerHTML = '';
+                    }
+                }
+            });
+
+            // If batch is done, stop polling
+            if (data.batch_done) {
+                clearInterval(intervalId);
+            }
+        }
+
+        var intervalId = setInterval(refreshBatch, POLL_MS);
+        // Also stop polling when batch completes (browser detects it)
+        refreshBatch();
+    })();
+    </script>
+</body>
+</html>

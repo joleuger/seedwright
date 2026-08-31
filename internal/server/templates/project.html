@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }}{{ if .Project }} — {{ .Project }}{{ end }}</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh}
+        .nav{background:#16213e;border-bottom:1px solid #0f3460;padding:0.75rem 1.5rem;display:flex;align-items:center;gap:1.5rem;position:relative}
+        .nav a{color:#a0a0b0;text-decoration:none;font-size:0.9rem;padding:0.3rem 0.6rem;border-radius:4px}
+        .nav a:hover,.nav a.active{color:#e94560;background:rgba(233,69,96,0.1)}
+        .nav .logo{font-weight:700;font-size:1.1rem;color:#e94560;margin-right:auto}
+        .nav .project-name{color:#53d8fb;font-weight:600}
+        .nav select{background:#0d1b36;border:1px solid #0f3460;color:#e0e0e0;padding:0.3rem 0.6rem;border-radius:4px;font-size:0.85rem}
+        .nav select:focus{outline:none;border-color:#53d8fb}
+        /* More dropdown */
+        #moreMenuToggle{cursor:pointer}
+        #moreMenuDropdown{display:none;position:absolute;top:100%;right:1.5rem;background:#16213e;border:1px solid #0f3460;border-radius:6px;padding:0.25rem 0;z-index:500;min-width:140px;box-shadow:0 4px 16px rgba(0,0,0,0.4)}
+        #moreMenuDropdown.show{display:block}
+        #moreMenuDropdown a{display:block;padding:0.4rem 1rem;color:#a0a0b0;text-decoration:none;font-size:0.85rem;border-radius:0}
+        #moreMenuDropdown a:hover{background:rgba(233,69,96,0.1);color:#e94560}
+        .container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+        .flash{background:#0f3460;border-left:4px solid #53d8fb;padding:0.75rem 1rem;margin-bottom:1.5rem;border-radius:0 4px 4px 0}
+        .flash.error{border-left-color:#e94560;background:rgba(233,69,96,0.1)}
+        h1{font-size:1.5rem;margin-bottom:1rem;color:#fff}
+        h2{font-size:1.2rem;margin-bottom:0.75rem;color:#ccc}
+        .card{background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem}
+        .btn{display:inline-block;background:#e94560;color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:4px;font-size:0.9rem;cursor:pointer;text-decoration:none}
+        .btn:hover{background:#c73652}.btn-secondary{background:#0f3460}.btn-secondary:hover{background:#1a4a8a}
+        label{display:block;font-size:0.85rem;color:#a0a0b0;margin-bottom:0.3rem}
+        input,textarea,select{width:100%;background:#0d1b36;border:1px solid #0f3460;color:#e0e0e0;padding:0.5rem 0.75rem;border-radius:4px;font-size:0.9rem;font-family:inherit}
+        input:focus,textarea:focus,select:focus{outline:none;border-color:#53d8fb}
+        textarea{resize:vertical;min-height:80px}
+        .form-group{margin-bottom:1rem}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+        .form-row.three{grid-template-columns:1fr 1fr 1fr}
+        .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-top:1rem}
+        .gallery-item{background:#16213e;border:1px solid #0f3460;border-radius:8px;overflow:hidden;text-decoration:none;color:inherit;transition:transform 0.2s,border-color 0.2s}
+        .gallery-item:hover{transform:translateY(-2px);border-color:#e94560}
+        .gallery-item img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+        .gallery-item .meta{padding:0.5rem;font-size:0.75rem;color:#a0a0b0}
+        .pagination{display:flex;gap:0.5rem;margin-top:1.5rem;justify-content:center}
+        .pagination a,.pagination span{padding:0.4rem 0.8rem;border-radius:4px;text-decoration:none;font-size:0.85rem}
+        .pagination a{background:#16213e;color:#a0a0b0;border:1px solid #0f3460}
+        .pagination a:hover{background:#0f3460;color:#fff}
+        .pagination .current{background:#e94560;color:#fff}
+        .element-detail{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
+        @media(max-width:768px){.element-detail{grid-template-columns:1fr}.form-row,.form-row.three{grid-template-columns:1fr}}
+        .element-detail img{width:100%;border-radius:8px;border:1px solid #0f3460}
+        .detail-meta{display:grid;gap:0.5rem}
+        .detail-meta .row{display:flex;gap:0.5rem}
+        .detail-meta .key{color:#a0a0b0;font-size:0.85rem;min-width:120px}
+        .detail-meta .value{color:#e0e0e0;font-size:0.85rem;word-break:break-word}
+        .prompt-text{background:#0d1b36;padding:0.75rem;border-radius:4px;font-size:0.9rem;line-height:1.5;border:1px solid #0f3460}
+        .status-queued{color:#53d8fb}.status-generating{color:#f39c12}.status-completed{color:#00b894}.status-failed{color:#e94560}
+        .empty-state{text-align:center;padding:3rem;color:#a0a0b0}
+        .job-status{display:inline-flex;align-items:center;gap:0.4rem;background:#0d1b36;padding:0.4rem 0.8rem;border-radius:6px;border:1px solid #0f3460;font-size:0.85rem}
+        .job-status .spinner{width:14px;height:14px;border:2px solid #53d8fb;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .job-status a{color:#53d8fb;text-decoration:none;margin-left:0.3rem}
+        .job-status a:hover{text-decoration:underline}
+        .job-status .cancel-btn{background:none;border:1px solid #e94560;color:#e94560;padding:0.15rem 0.5rem;border-radius:3px;cursor:pointer;font-size:0.75rem;margin-left:0.5rem}
+        .job-status .cancel-btn:hover{background:#e94560;color:#fff}
+        .refresh-btn{background:none;border:1px solid #0f3460;color:#a0a0b0;padding:0.25rem 0.6rem;border-radius:4px;cursor:pointer;font-size:0.8rem;margin-left:0.5rem}
+        .refresh-btn:hover{border-color:#53d8fb;color:#53d8fb}
+        .welcome-projects{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-top:1.5rem}
+        .welcome-project-card{background:#16213e;border:2px solid #0f3460;border-radius:8px;padding:1.5rem;text-align:center;text-decoration:none;color:inherit;transition:all 0.2s;cursor:pointer}
+        .welcome-project-card:hover{border-color:#53d8fb;transform:translateY(-2px)}
+        .welcome-project-card .name{font-size:1.1rem;font-weight:600;color:#53d8fb}
+        .welcome-project-card .count{font-size:0.85rem;color:#a0a0b0;margin-top:0.5rem}
+        /* Modal & settings */
+        .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;justify-content:center;align-items:center}
+        .modal-overlay.active{display:flex}
+        .modal{background:#16213e;border:1px solid #0f3460;border-radius:12px;padding:2rem;width:90%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.4);position:relative}
+        .modal h2{margin-bottom:1.5rem;color:#fff}
+        .modal-actions{display:flex;flex-direction:column;gap:0.75rem;margin-top:1.5rem}
+        .modal .btn{width:100%;text-align:center}
+        .modal-close{position:absolute;top:1rem;right:1rem;background:none;border:none;color:#a0a0b0;font-size:1.3rem;cursor:pointer}
+        .modal-close:hover{color:#fff}
+        .switch-label{display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;color:#a0a0b0;cursor:pointer}
+        .switch{position:relative;width:36px;height:20px;flex-shrink:0}
+        .switch input{opacity:0;width:0;height:0}
+        .switch .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#0f3460;border-radius:20px;transition:0.3s}
+        .switch .slider:before{position:absolute;content:"";height:16px;width:16px;left:2px;bottom:2px;background:#fff;border-radius:50%;transition:0.3s}
+        .switch input:checked+.slider{background:#e94560}
+        .switch input:checked+.slider:before{transform:translateX(16px)}
+        .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#16213e;border:1px solid #0f3460;color:#e0e0e0;padding:0.75rem 1.5rem;border-radius:8px;z-index:2000;opacity:0;transition:opacity 0.3s;pointer-events:none}
+        .toast.show{opacity:1}
+        .toast.success{border-color:#00b894}
+        .toast.error{border-color:#e94560}
+        .project-header{display:flex;align-items:center;gap:0.5rem}
+        .project-header .settings-btn{background:none;border:none;color:#a0a0b0;font-size:1.1rem;cursor:pointer;padding:0.2rem 0.4rem;border-radius:4px}
+        .project-header .settings-btn:hover{color:#e94560;background:rgba(233,69,96,0.1)}
+        .backend-badge{font-size:0.75rem;padding:0.15rem 0.5rem;border-radius:10px;background:#0d1b36;color:#53d8fb;border:1px solid #0f3460}
+    </style>
+</head>
+<body>
+    <script>
+    window.__EXTENSIONS__ = { {{ range $i, $k := .EnabledExtensions }}{{ if $i }},{{ end }}"{{ $k }}": true{{ end }} };
+    </script>
+    <nav class="nav">
+        <a class="logo" href="{{ urlPath "/" }}">seedwright</a>
+        {{ if .Project }}
+        <div class="project-header">
+            <span class="project-name">{{ .Project }}</span>
+            {{ if .BackendURL }}<span class="backend-badge">{{ .BackendURL }}</span>{{ end }}
+            <a href="{{ urlPath "/basic/" }}{{ .Project }}/settings" class="settings-btn" title="Project settings">⚙</a>
+        </div>
+        <a href="{{ urlPath (print "/basic/" .Project) }}" {{ if eq .Page "dashboard" }}class="active"{{ end }}>Dashboard</a>
+        <a href="{{ urlPath (print "/basic/" .Project "/gallery") }}" {{ if eq .Page "gallery" }}class="active"{{ end }}>Gallery</a>
+        <a href="{{ urlPath (print "/basic/" .Project "/external") }}" {{ if eq .Page "external" }}class="active"{{ end }}>Upload</a>
+        {{ if .NavItems }}{{ .NavItems | safeHTML }}{{ end }}
+        <div id="moreMenuWrapper" style="position:relative;display:inline-block">
+            <a href="#" id="moreMenuToggle" onclick="event.preventDefault();toggleMoreMenu()" style="color:#a0a0b0;text-decoration:none;font-size:0.85rem;padding:0.3rem 0.6rem;border-radius:4px;cursor:pointer">⋯</a>
+            <div id="moreMenuDropdown">
+                {{ if .MoreNavItems }}{{ .MoreNavItems | safeHTML }}{{ end }}
+                {{ if not .ProjectHidden }}
+                <a href="{{ urlPath "/claim-ownership" }}">Claim Ownership</a>
+                {{ end }}
+            </div>
+        </div>
+        {{ else }}
+        <a href="{{ urlPath "/" }}" class="active">Home</a>
+        {{ end }}
+    </nav>
+    <div class="container">
+        {{ if .Flash }}<div class="flash">{{ .Flash }}</div>{{ end }}
+        {{ if .Error }}<div class="flash error">{{ .Error }}</div>{{ end }}
+
+        {{ if .ShowCreate }}
+        <div class="card" style="text-align:center;">
+            <p style="color:#a0a0b0;margin-bottom:1rem;">Create this project to start generating?</p>
+            <button class="btn" id="createProjectBtn" onclick="createProject(this, '{{ .Project }}')">Create Project</button>
+        </div>
+        {{ end }}
+
+        {{ if not .ShowCreate }}
+        <h1>{{ .Project }} — Dashboard</h1>
+
+        <div class="card">
+            <h2>New Generation</h2>
+            <form action="{{ urlPath (print "/api/" .Project "/generate") }}" method="post" id="generateForm">
+                <div class="form-group">
+                    <label for="prompt">Prompt *</label>
+                    <textarea id="prompt" name="prompt" required rows="3" placeholder="A beautiful sunset over the ocean..."></textarea>
+                    {{ if hasExtension "joleuger/batch" }}
+                    <div style="font-size:0.75rem;color:#808090;margin-top:0.3rem;">
+                        Use <code style="background:#0d1b36;padding:0.1rem 0.3rem;border-radius:3px;">{car,motorcycle}</code> for combination syntax.
+                    </div>
+                    {{ end }}
+                </div>
+
+                <!-- Hidden seeds field (batch expansion; single value when batch disabled) -->
+                <input type="hidden" id="seeds" name="seeds" value="">
+                <!-- Hidden reference IDs field (img2img reference images) -->
+                <input type="hidden" id="reference_ids" name="reference_ids" value="">
+                <div class="form-group">
+                    <label for="negative_prompt">Negative Prompt</label>
+                    <textarea id="negative_prompt" name="negative_prompt" rows="2" placeholder="blurry, low quality..."></textarea>
+                </div>
+
+                <!-- img2img: Reference Images Picker -->
+                <div class="form-group" id="refImagesGroup" style="display:none;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+                        <label style="margin:0;">Reference Images</label>
+                        <button type="button" class="refresh-btn" onclick="openRefImagePicker()" style="font-size:0.8rem;">+ Add</button>
+                    </div>
+                    <div id="refImagesList" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.3rem;"></div>
+                    <div style="font-size:0.75rem;color:#808090;margin-top:0.3rem;">
+                        Add external or gallery images to use as reference for img2img.
+                    </div>
+                </div>
+
+                <!-- Strength slider (img2img) -->
+                <div class="form-group" id="strengthGroup" style="display:none;">
+                    <div style="display:flex;justify-content:space-between;">
+                        <label for="strength">Denoise Strength</label>
+                        <span id="strengthValue" style="color:#53d8fb;font-size:0.85rem;">0.75</span>
+                    </div>
+                    <input type="range" id="strength" name="strength" min="0" max="1" step="0.05" value="0.75"
+                           style="width:100%;margin-top:0.3rem;">
+                    <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:#808090;margin-top:0.2rem;">
+                        <span>0.0 (keep original)</span>
+                        <span>1.0 (full noise)</span>
+                    </div>
+                </div>
+
+                <div class="form-row three">
+                    <div class="form-group">
+                        <label for="width">Width</label>
+                        <input type="number" id="width" name="width" value="{{ .Width }}" min="64" max="2048" step="64">
+                    </div>
+                    <div class="form-group">
+                        <label for="height">Height</label>
+                        <input type="number" id="height" name="height" value="{{ .Height }}" min="64" max="2048" step="64">
+                    </div>
+                    <div class="form-group">
+                        <label for="steps">Steps</label>
+                        <input type="number" id="steps" name="steps" value="{{ .Steps }}" min="1" max="200">
+                    </div>
+                </div>
+                <div class="form-row three">
+                    <div class="form-group">
+                        <label for="cfg">CFG Scale</label>
+                        <input type="number" id="cfg" name="cfg" value="{{ .Cfg }}" min="1" max="30" step="0.5">
+                    </div>
+                    <div class="form-group">
+                        <label for="seed">Seed (-1 = random)</label>
+                        <div style="display:flex;gap:0.4rem;">
+                            <input type="number" id="seed" name="seed" value="{{ .Seed }}" min="-1" style="flex:1;">
+                            <button type="button" class="refresh-btn" onclick="randomizeSeed()" title="Random seed" style="padding:0.5rem 0.6rem;font-size:1.1rem;line-height:1;">🎲</button>
+                        </div>
+                    </div>
+                    <div class="form-group" style="display:flex;align-items:flex-end;">
+                        <button type="button" class="btn" id="generateBtn" onclick="handleGenerate()" style="width:100%;">Generate</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        {{ if .ActiveJobs }}
+        <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+                <h2 style="margin:0;">Jobs</h2>
+                <div style="display:flex;gap:0.5rem;">
+                    <button class="refresh-btn" onclick="refreshJobs()">↻ Refresh</button>
+                    <button class="refresh-btn" onclick="cancelAllJobs('{{ .Project }}')" style="border-color:#e94560;color:#e94560;">Cancel All</button>
+                </div>
+            </div>
+            <div id="activeJobsList">
+            {{ range .ActiveJobs }}
+            <div class="job-status">
+                <span class="spinner"></span>
+                <span class="status-{{ .Status }}">{{ .Status }}</span>
+                <a href="{{ urlPath (print "/basic/" $.Project "/element/" .ElementID) }}">element/{{ .ElementID }}</a>
+                <button class="cancel-btn" onclick="cancelJob('{{ .ID }}')">cancel</button>
+            </div>
+            {{ end }}
+            </div>
+        </div>
+        {{ end }}
+
+        {{ if .RecentElements }}
+        <div class="card">
+            <h2>Recent</h2>
+            <div class="gallery-grid">
+                {{ range .RecentElements }}
+                <a href="{{ urlPath (print "/basic/" $.Project "/element/" .ID) }}" class="gallery-item">
+                    <img src="{{ urlPath (print "/basic/" $.Project "/element/" .ID "/image") }}" alt="Generated" loading="lazy">
+                    <div class="meta">Seed: {{ if .Generation }}{{ .Generation.Seed }}{{ end }}</div>
+                </a>
+                {{ end }}
+            </div>
+        </div>
+        {{ end }}
+
+        <div class="card">
+            <h2>Help</h2>
+            <h4 style="color:#ccc;margin:0.5rem 0;">Quick prompts</h4>
+            <ul style="color:#a0a0b0;padding-left:1.5rem;line-height:1.8;">
+                <li><code>a photograph of a beautiful sunset over the ocean</code></li>
+                <li><code>a cyberpunk city at night with neon lights, cinematic, 8k</code></li>
+                <li><code>an oil painting of a cottage in a meadow, impressionist style</code></li>
+                <li><code>a cat sitting on a windowsill, soft lighting, detailed fur</code></li>
+            </ul>
+            <h4 style="color:#ccc;margin:1rem 0 0.5rem;">Tips</h4>
+            <ul style="color:#a0a0b0;padding-left:1.5rem;line-height:1.8;">
+                <li>Be descriptive — include subject, style, lighting, mood</li>
+                <li>Use negative_prompt to exclude unwanted elements</li>
+                <li>Higher CFG (7–12) follows prompt more strictly; lower (3–5) is more creative</li>
+                <li>Seed -1 = random; use a fixed seed to reproduce results</li>
+                <li>Steps: 2 for quick previews; 20–40 for most quality</li>
+            </ul>
+        </div>
+
+        {{ end }}
+    </div>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
+
+    {{ if hasExtension "joleuger/batch" }}
+    <!-- Preview Modal -->
+    <div class="modal-overlay" id="previewModal">
+        <div class="modal" style="max-width:600px;">
+            <button class="modal-close" onclick="closePreview()">×</button>
+            <h2 id="previewTitle">Preview</h2>
+            <div id="previewContent"></div>
+            <div class="modal-actions">
+                <button class="btn" id="generateSingleBtn" onclick="submitSingleJob()" style="display:none;">Generate (1 job)</button>
+                <button class="btn" id="confirmCreateBtn" onclick="submitToBatch()" style="display:none;">Create Batch</button>
+                <button class="btn btn-secondary" onclick="closePreview()">Cancel</button>
+            </div>
+        </div>
+    </div>
+    {{ end }}
+
+    <!-- Reference Image Picker Modal -->
+    <div class="modal-overlay" id="refImagePickerModal">
+        <div class="modal" style="max-width:500px;">
+            <button class="modal-close" onclick="closeRefImagePicker()">×</button>
+            <h2>Select Reference Images</h2>
+            <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
+                <button class="btn btn-secondary" onclick="loadRefImages('external')" style="font-size:0.85rem;padding:0.3rem 0.8rem;">External</button>
+                <button class="btn btn-secondary" onclick="loadRefImages('gallery')" style="font-size:0.85rem;padding:0.3rem 0.8rem;">Gallery</button>
+            </div>
+            <div id="refImagePickerContent" style="max-height:300px;overflow-y:auto;">
+                <p style="color:#a0a0b0;font-size:0.85rem;">Click a button to load images.</p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="addSelectedRefImages()">Add Selected</button>
+                <button class="btn btn-secondary" onclick="closeRefImagePicker()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let currentProject = '';
+    let pollingInterval = null;
+
+    // Prefix-aware URL helper
+    var __URL_PREFIX__ = '{{ .prefix }}';
+    function url(path) { return __URL_PREFIX__ + path; }
+
+    // ---- More dropdown toggle ----
+    function toggleMoreMenu() {
+        const dropdown = document.getElementById('moreMenuDropdown');
+        dropdown.classList.toggle('show');
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        const wrapper = document.getElementById('moreMenuWrapper');
+        const dropdown = document.getElementById('moreMenuDropdown');
+        if (wrapper && !wrapper.contains(e.target)) {
+            dropdown.classList.remove('show');
+        }
+    });
+
+    // ---- Randomize seed (🎲) ----
+    function randomizeSeed() {
+        // glibc-style LCG seeded with Date.now(), output in [0, 2^31 - 1]
+        let s = Date.now();
+        s = (s * 1103515245 + 12345) & 0x7fffffff;
+        document.getElementById('seed').value = s;
+    }
+
+    // ---- Project creation ----
+    function createProject(btn, name) {
+        btn.disabled = true;
+        btn.textContent = 'Creating...';
+        fetch(url('/api/' + name + '/create'), { method: 'POST' })
+            .then(r => {
+                if (r.ok) {
+                    window.location.href = url('/basic/' + name);
+                } else {
+                    r.text().then(msg => alert('Create failed: ' + msg));
+                    btn.disabled = false;
+                    btn.textContent = 'Create Project';
+                }
+            })
+            .catch(() => {
+                alert('Create failed');
+                btn.disabled = false;
+                btn.textContent = 'Create Project';
+            });
+    }
+
+    // ---- Active jobs polling (partial DOM update, no full reload) ----
+    function refreshJobs() {
+        const project = '{{ .Project }}';
+        fetch(url('/api/' + project + '/jobs/active'))
+            .then(r => r.json())
+            .then(jobs => {
+                const list = document.getElementById('activeJobsList');
+                if (!list) return;
+
+                if (jobs.length === 0) {
+                    // No active jobs — stop polling, show message
+                    list.innerHTML = '<p style="color:#a0a0b0;font-size:0.85rem;">All jobs completed.</p>';
+                    if (pollingInterval) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                    }
+                    return;
+                }
+
+                // Build job entries
+                let html = '';
+                jobs.forEach(job => {
+                    html += '<div class="job-status">' +
+                        '<span class="spinner"></span>' +
+                        '<span class="status-' + job.status + '">' + job.status + '</span>' +
+                        '<a href="' + url('/basic/' + project + '/element/' + job.element_id) + '">element/' + job.element_id + '</a>' +
+                        '<button class="cancel-btn" onclick="cancelJob(\'' + job.id + '\')">cancel</button>' +
+                        '</div>';
+                });
+                list.innerHTML = html;
+            })
+            .catch(() => {
+                // On fetch error, do a minimal refresh — update job list only
+                const list = document.getElementById('activeJobsList');
+                if (list) {
+                    list.innerHTML = '<p style="color:#e94560;font-size:0.85rem;">Failed to fetch job status.</p>';
+                }
+            });
+    }
+
+    function cancelJob(jobId) {
+        const project = '{{ .Project }}';
+        fetch(url('/api/' + project + '/jobs/' + jobId + '/cancel'), { method: 'POST' })
+            .then(r => {
+                if (r.ok) {
+                    // Update DOM without reload
+                    const list = document.getElementById('activeJobsList');
+                    if (list) refreshJobs();
+                } else {
+                    r.text().then(msg => alert('Cancel failed: ' + msg));
+                }
+            })
+            .catch(() => alert('Cancel failed'));
+    }
+
+    function cancelAllJobs(project) {
+        if (!confirm('Cancel all stuck jobs for this project?')) return;
+        fetch(url('/api/' + project + '/jobs/cancel-all'), { method: 'POST' })
+            .then(r => {
+                if (r.ok) {
+                    showToast('All stuck jobs cancelled', 'success');
+                    refreshJobs();
+                } else {
+                    r.text().then(msg => alert('Cancel all failed: ' + msg));
+                }
+            })
+            .catch(() => alert('Cancel all failed'));
+    }
+
+    function deleteProject() {
+        if (!currentProject) return;
+        if (!confirm('Delete project "' + currentProject + '"? This will permanently remove all elements, images, metadata, and job records.')) return;
+        fetch(url('/api/' + currentProject + '/delete'), { method: 'POST' })
+            .then(r => {
+                if (r.ok) {
+                    window.location.href = url('/');
+                } else {
+                    r.text().then(msg => alert('Delete failed: ' + msg));
+                }
+            })
+            .catch(() => alert('Delete failed'));
+    }
+
+    // ---- Save form state to localStorage on input ----
+    (function() {
+        const form = document.getElementById('generateForm');
+        if (!form) return;
+        const project = '{{ .Project }}';
+
+        // Restore saved state (form persistence + reuse settings)
+        try {
+            // Check for "reuse settings" first (higher priority)
+            const reuse = JSON.parse(localStorage.getItem('sdcpp_reuse_' + project));
+            if (reuse) {
+                if (reuse.prompt) document.getElementById('prompt').value = reuse.prompt;
+                if (reuse.negative_prompt) document.getElementById('negative_prompt').value = reuse.negative_prompt;
+                if (reuse.width) document.getElementById('width').value = reuse.width;
+                if (reuse.height) document.getElementById('height').value = reuse.height;
+                if (reuse.steps) document.getElementById('steps').value = reuse.steps;
+                if (reuse.cfg) document.getElementById('cfg').value = reuse.cfg;
+                if (reuse.seed !== undefined && reuse.seed !== null) document.getElementById('seed').value = reuse.seed;
+                // Load reference images from reuse settings
+                if (reuse.reference_ids && reuse.reference_ids.length > 0) {
+                    for (var i = 0; i < reuse.reference_ids.length; i++) {
+                        addRefImageThumb(reuse.reference_ids[i]);
+                    }
+                }
+                localStorage.removeItem('sdcpp_reuse_' + project);
+            } else {
+                const saved = JSON.parse(localStorage.getItem('sdcpp_form_' + project));
+                if (saved) {
+                    if (saved.prompt) document.getElementById('prompt').value = saved.prompt;
+                    if (saved.negative_prompt) document.getElementById('negative_prompt').value = saved.negative_prompt;
+                    if (saved.width) document.getElementById('width').value = saved.width;
+                    if (saved.height) document.getElementById('height').value = saved.height;
+                    if (saved.steps) document.getElementById('steps').value = saved.steps;
+                    if (saved.cfg) document.getElementById('cfg').value = saved.cfg;
+                    if (saved.seed) document.getElementById('seed').value = saved.seed;
+                }
+            }
+        } catch(e) {}
+
+        // Save on every change
+        form.addEventListener('input', function() {
+            const data = {
+                prompt: document.getElementById('prompt').value,
+                negative_prompt: document.getElementById('negative_prompt').value,
+                width: document.getElementById('width').value,
+                height: document.getElementById('height').value,
+                steps: document.getElementById('steps').value,
+                cfg: document.getElementById('cfg').value,
+                seed: document.getElementById('seed').value,
+            };
+            localStorage.setItem('sdcpp_form_' + project, JSON.stringify(data));
+        });
+    })();
+
+    // ---- Preview / Generate routing ----
+    // Both functions expand variants via the batch preview endpoint
+    // and show the same confirmation modal. The modal lets the user
+    // confirm before the action fires — this is the safety valve that
+    // prevents accidental hundreds-of-jobs submissions.
+
+    function expandVariants() {
+        const project = '{{ .Project }}';
+        const prompt = document.getElementById('prompt').value.trim();
+        const seeds = document.getElementById('seed').value;
+        if (!prompt) {
+            alert('Enter a prompt first');
+            return null;
+        }
+        return fetch(url('/api/' + project + '/ext/joleuger/batch/preview'), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({prompt: prompt, seeds: seeds}),
+        }).then(r => r.json());
+    }
+
+    function syncRefIdsToForm() {
+        var ids = [];
+        var thumbs = document.querySelectorAll('#refImagesList > div[data-element-id]');
+        for (var i = 0; i < thumbs.length; i++) {
+            ids.push(thumbs[i].getAttribute('data-element-id'));
+        }
+        document.getElementById('reference_ids').value = JSON.stringify(ids);
+    }
+
+    function handleGenerate() {
+        // When batch is disabled, submit directly — no expansion.
+        if (!window.__EXTENSIONS__ || !window.__EXTENSIONS__["joleuger/batch"]) {
+            syncRefIdsToForm();
+            document.getElementById('generateForm').submit();
+            return;
+        }
+        expandVariants().then(data => {
+            if (!data || !data.count) return;
+            // Always show the modal — single-job and batch both need
+            // confirmation. This prevents accidental hundreds-of-jobs
+            // submissions from combo syntax or seed lists.
+            showPreviewModal(data);
+        });
+    }
+
+    function showPreviewModal(data) {
+        if (!data || !data.count || data.count < 1) {
+            alert('Could not expand — no variants found');
+            return;
+        }
+
+        const title = data.count === 1
+            ? '1 variant — ready to generate'
+            : data.count + ' variants — confirm to create batch';
+        document.getElementById('previewTitle').textContent = title;
+
+        let html = '<p style="color:#a0a0b0;margin-bottom:0.75rem;">';
+        html += data.count === 1
+            ? 'Single prompt, no expansion needed.'
+            : 'This will create ' + data.count + ' job(s):';
+        html += '</p>';
+
+        if (data.count > 1) {
+            html += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">';
+            html += '<thead><tr style="color:#8080a0;"><th>#</th><th>Prompt</th><th>Seed</th></tr></thead>';
+            html += '<tbody>';
+            const limit = 20;
+            const shown = data.variants.slice(0, limit);
+            for (let i = 0; i < shown.length; i++) {
+                const v = shown[i];
+                html += '<tr style="border-bottom:1px solid #2a2a3a;">';
+                html += '<td style="padding:0.25rem 0.5rem;">' + (i + 1) + '</td>';
+                html += '<td style="padding:0.25rem 0.5rem;color:#d0d0d8;">' + escapeHTML(v.prompt) + '</td>';
+                html += '<td style="padding:0.25rem 0.5rem;color:#8080a0;">' + v.seed + '</td>';
+                html += '</tr>';
+            }
+            if (data.count > limit) {
+                html += '<tr><td colspan="3" style="padding:0.5rem;color:#8080a0;">… and ' + (data.count - limit) + ' more</td></tr>';
+            }
+            html += '</tbody></table>';
+        }
+
+        document.getElementById('previewContent').innerHTML = html;
+        document.getElementById('previewModal').classList.add('active');
+
+        // Show/hide Generate (single-job) and Create Batch buttons
+        document.getElementById('generateSingleBtn').style.display = data.count === 1 ? 'inline-block' : 'none';
+        document.getElementById('confirmCreateBtn').style.display = data.count > 1 ? 'inline-block' : 'none';
+    }
+
+    function submitToBatch() {
+        closePreview();
+        // Validate the prompt is populated before sending.
+        var promptEl = document.getElementById('prompt');
+        if (!promptEl || !promptEl.value.trim()) {
+            alert('Enter a prompt first');
+            return;
+        }
+        document.getElementById('seeds').value = document.getElementById('seed').value;
+        syncRefIdsToForm();
+        fetch(url('/api/' + project + '/ext/joleuger/batch/generate'), {
+            method: 'POST',
+            body: new FormData(document.getElementById('generateForm')),
+        }).then(function(r) {
+            if (r.ok || r.redirected) {
+                return r.url;
+            }
+            // Parse JSON error body if available.
+            return r.text().then(function(body) {
+                try {
+                    var json = JSON.parse(body);
+                    throw new Error(json.error || body);
+                } catch (_) {
+                    throw new Error(body);
+                }
+            });
+        }).then(function(url) {
+            if (url) window.location.href = url;
+        }).catch(function(e) {
+            alert('Batch failed: ' + e.message);
+        });
+    }
+
+    function submitSingleJob() {
+        closePreview();
+        syncRefIdsToForm();
+        // Expand to get the single variant's prompt and seed.
+        expandVariants().then(data => {
+            if (!data || !data.variants || data.variants.length !== 1) return;
+            document.getElementById('prompt').value = data.variants[0].prompt;
+            document.getElementById('seed').value = data.variants[0].seed;
+            document.getElementById('generateForm').submit();
+        });
+    }
+
+    function closePreview() {
+        document.getElementById('previewModal').classList.remove('active');
+    }
+
+    function escapeHTML(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    // Close modal on overlay click
+    document.getElementById('previewModal').addEventListener('click', function(e) {
+        if (e.target === this) closePreview();
+    });
+    document.getElementById('refImagePickerModal').addEventListener('click', function(e) {
+        if (e.target === this) closeRefImagePicker();
+    });
+
+    // ---- img2img Reference Image Picker ----
+    let selectedRefImageIds = [];
+    let loadedRefImages = [];
+
+    function openRefImagePicker() {
+        selectedRefImageIds = [];
+        loadedRefImages = [];
+        document.getElementById('refImagePickerContent').innerHTML = '<p style="color:#a0a0b0;font-size:0.85rem;">Click a button to load images.</p>';
+        document.getElementById('refImagePickerModal').classList.add('active');
+    }
+
+    function closeRefImagePicker() {
+        document.getElementById('refImagePickerModal').classList.remove('active');
+    }
+
+    function loadRefImages(type) {
+        const project = '{{ .Project }}';
+        const content = document.getElementById('refImagePickerContent');
+        content.innerHTML = '<p style="color:#a0a0b0;font-size:0.85rem;">Loading...</p>';
+
+        const query = type === 'external'
+            ? 'origin=external&per_page=all'
+            : 'per_page=all';
+
+        fetch(url('/api/' + project + '/elements?' + query))
+            .then(r => {
+                if (!r.ok) throw new Error('Failed to load elements (' + r.status + ')');
+                return r.json();
+            })
+            .then(data => {
+                loadedRefImages = (data.elements || []).map(el => ({
+                    id: el.id,
+                    thumb: url('/basic/' + project + '/element/' + el.id + '/image'),
+                }));
+                renderRefImageSelection();
+            })
+            .catch(err => {
+                content.innerHTML = '<p style="color:#e94560;font-size:0.85rem;">Failed to load ' + type + ' images: ' + err.message + '</p>';
+            });
+    }
+
+    function selectRefImage(id, thumbSrc) {
+        if (selectedRefImageIds.includes(id)) {
+            selectedRefImageIds = selectedRefImageIds.filter(i => i !== id);
+        } else {
+            selectedRefImageIds.push(id);
+        }
+        renderRefImageSelection();
+    }
+
+    function renderRefImageSelection() {
+        const content = document.getElementById('refImagePickerContent');
+        let html = '';
+        loadedRefImages.forEach(img => {
+            const selected = selectedRefImageIds.includes(img.id);
+            html += '<div style="display:inline-block;margin:0.25rem;cursor:pointer;position:relative;">' +
+                '<img src="' + img.thumb + '" style="width:64px;height:64px;object-fit:cover;border-radius:4px;border:2px solid ' + (selected ? '#e94560' : '#0f3460') + ';">' +
+                '<input type="checkbox" ' + (selected ? 'checked' : '') + ' style="position:absolute;top:0;left:0;width:16px;height:16px;">' +
+                '</div>';
+        });
+        content.innerHTML = html || '<p style="color:#a0a0b0;font-size:0.85rem;">No images available.</p>';
+    }
+
+    function addSelectedRefImages() {
+        const list = document.getElementById('refImagesList');
+        selectedRefImageIds.forEach(id => {
+            const img = loadedRefImages.find(i => i.id === id);
+            if (!img) return;
+            const el = document.createElement('div');
+            el.className = 'ref-image-thumb';
+            el.dataset.elementId = id;
+            el.style.cssText = 'width:48px;height:48px;overflow:hidden;border-radius:4px;border:1px solid #0f3460;position:relative;cursor:pointer;';
+            el.innerHTML = '<img src="' + img.thumb + '" style="width:100%;height:100%;object-fit:cover;">' +
+                '<div style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.65rem;opacity:0;transition:opacity 0.2s;">×</div>';
+            el.onmouseenter = function() { this.children[1].style.opacity = '1'; };
+            el.onmouseleave = function() { this.children[1].style.opacity = '0'; };
+            el.onclick = function() {
+                // Remove from selection
+                const idx = selectedRefImageIds.indexOf(id);
+                if (idx > -1) selectedRefImageIds.splice(idx, 1);
+                el.remove();
+                updateRefImagesVisibility();
+            };
+            list.appendChild(el);
+        });
+        closeRefImagePicker();
+        updateRefImagesVisibility();
+    }
+
+    function updateRefImagesVisibility() {
+        const hasRefs = document.getElementById('refImagesList').children.length > 0;
+        document.getElementById('refImagesGroup').style.display = hasRefs ? 'block' : 'none';
+        document.getElementById('strengthGroup').style.display = hasRefs ? 'block' : 'none';
+    }
+
+    // ---- Add a reference image thumbnail to the list ----
+    function addRefImageThumb(elementId) {
+        // Check for duplicate
+        const list = document.getElementById('refImagesList');
+        for (var i = 0; i < list.children.length; i++) {
+            if (list.children[i].dataset.elementId === elementId) return; // already added
+        }
+        var thumbUrl = url('/basic/' + '{{ .Project }}' + '/element/' + elementId + '/image');
+        var el = document.createElement('div');
+        el.className = 'ref-image-thumb';
+        el.style.cssText = 'width:48px;height:48px;overflow:hidden;border-radius:4px;border:1px solid #0f3460;position:relative;cursor:pointer;';
+        el.dataset.elementId = elementId;
+        el.innerHTML = '<img src="' + thumbUrl + '" style="width:100%;height:100%;object-fit:cover;">' +
+            '<div style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.65rem;opacity:0;transition:opacity 0.2s;">×</div>';
+        el.onmouseenter = function() { this.children[1].style.opacity = '1'; };
+        el.onmouseleave = function() { this.children[1].style.opacity = '0'; };
+        el.onclick = function() {
+            // Remove from DOM
+            el.remove();
+            // Remove from localStorage
+            var refs = JSON.parse(localStorage.getItem('sdcpp_ref_' + '{{ .Project }}') || '[]');
+            refs = refs.filter(function(id) { return id !== elementId; });
+            localStorage.setItem('sdcpp_ref_' + '{{ .Project }}', JSON.stringify(refs));
+            updateRefImagesVisibility();
+        };
+        list.appendChild(el);
+        updateRefImagesVisibility();
+    }
+
+    // ---- Strength slider live update ----
+    (function() {
+        const slider = document.getElementById('strength');
+        const display = document.getElementById('strengthValue');
+        if (slider && display) {
+            slider.addEventListener('input', function() {
+                display.textContent = parseFloat(this.value).toFixed(2);
+            });
+        }
+    })();
+
+    // ---- Load persistent references from localStorage on init ----
+    (function() {
+        const project = '{{ .Project }}';
+        try {
+            var refs = JSON.parse(localStorage.getItem('sdcpp_ref_' + project) || '[]');
+            for (var i = 0; i < refs.length; i++) {
+                addRefImageThumb(refs[i]);
+            }
+        } catch(e) {}
+    })();
+
+    // ---- Auto-refresh while there are active jobs ----
+    {{ if .ActiveJobs }}
+    pollingInterval = setInterval(refreshJobs, 3000);
+    {{ end }}
+    </script>
+</body>
+</html>

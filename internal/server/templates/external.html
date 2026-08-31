@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }}{{ if .Project }} — {{ .Project }}{{ end }}</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh}
+        .nav{background:#16213e;border-bottom:1px solid #0f3460;padding:0.75rem 1.5rem;display:flex;align-items:center;gap:1.5rem}
+        .nav a{color:#a0a0b0;text-decoration:none;font-size:0.9rem;padding:0.3rem 0.6rem;border-radius:4px}
+        .nav a:hover,.nav a.active{color:#e94560;background:rgba(233,69,96,0.1)}
+        .nav .logo{font-weight:700;font-size:1.1rem;color:#e94560;margin-right:auto}
+        .nav .project-name{color:#53d8fb;font-weight:600}
+        .container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+        .flash{background:#0f3460;border-left:4px solid #53d8fb;padding:0.75rem 1rem;margin-bottom:1.5rem;border-radius:0 4px 4px 0}
+        .flash.error{border-left-color:#e94560;background:rgba(233,69,96,0.1)}
+        h1{font-size:1.5rem;margin-bottom:1rem;color:#fff}
+        h2{font-size:1.2rem;margin-bottom:0.75rem;color:#ccc}
+        .card{background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem}
+        .btn{display:inline-block;background:#e94560;color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:4px;font-size:0.9rem;cursor:pointer;text-decoration:none}
+        .btn:hover{background:#c73652}.btn-secondary{background:#0f3460}.btn-secondary:hover{background:#1a4a8a}
+        .gallery-controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem}
+        .gallery-controls-right{display:flex;align-items:center;gap:0.75rem}
+        .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-top:1rem}
+        .gallery-item{background:#16213e;border:1px solid #0f3460;border-radius:8px;overflow:hidden;text-decoration:none;color:inherit;transition:transform 0.2s,border-color 0.2s;position:relative}
+        .gallery-item:hover{transform:translateY(-2px);border-color:#e94560}
+        .gallery-item img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+        .gallery-item .meta{padding:0.5rem;font-size:0.75rem;color:#a0a0b0}
+        .pagination{display:flex;gap:0.5rem;margin-top:1.5rem;justify-content:center;flex-wrap:wrap}
+        .pagination a,.pagination span{padding:0.4rem 0.8rem;border-radius:4px;text-decoration:none;font-size:0.85rem}
+        .pagination a{background:#16213e;color:#a0a0b0;border:1px solid #0f3460}
+        .pagination a:hover{background:#0f3460;color:#fff}
+        .pagination .current{background:#e94560;color:#fff}
+        .empty-state{text-align:center;padding:3rem;color:#a0a0b0}
+        .drop-zone{border:2px dashed #0f3460;border-radius:8px;padding:2rem;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;margin-bottom:1rem;position:relative}
+        .drop-zone:hover,.drop-zone.drag-over{border-color:#e94560;background:rgba(233,69,96,0.05)}
+        .drop-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer}
+        .drop-zone .drop-label{color:#a0a0b0;font-size:0.9rem;pointer-events:none}
+        .drop-zone .drop-label span{color:#53d8fb}
+        .paste-hint{color:#808090;font-size:0.8rem;margin-top:0.5rem;pointer-events:none}
+    </style>
+</head>
+<body>
+    <script>
+    window.__EXTENSIONS__ = { {{ range $i, $k := .EnabledExtensions }}{{ if $i }},{{ end }}"{{ $k }}": true{{ end }} };
+    </script>
+    <nav class="nav">
+        <a class="logo" href="{{ urlPath "/" }}">seedwright</a>
+        {{ if .Project }}
+        <span class="project-name">{{ .Project }}</span>
+        <a href="{{ urlPath (print "/basic/" .Project) }}" {{ if eq .Page "dashboard" }}class="active"{{ end }}>Dashboard</a>
+        <a href="{{ urlPath (print "/basic/" .Project "/gallery") }}" {{ if eq .Page "gallery" }}class="active"{{ end }}>Gallery</a>
+        <a href="{{ urlPath (print "/basic/" .Project "/external") }}" {{ if eq .Page "external" }}class="active"{{ end }}>Upload</a>
+        {{ if .NavItems }}{{ .NavItems | safeHTML }}{{ end }}
+        {{ else }}
+        <a href="{{ urlPath "/" }}" class="active">Home</a>
+        {{ end }}
+    </nav>
+    <div class="container">
+        {{ if .Flash }}<div class="flash">{{ .Flash }}</div>{{ end }}
+        {{ if .Error }}<div class="flash error">{{ .Error }}</div>{{ end }}
+
+        <h1>Upload — {{ .Project }}</h1>
+
+        <!-- Upload Card — click, drop, or paste -->
+        <div class="card">
+            <h2>Upload Image</h2>
+            <div class="drop-zone" id="dropZone">
+                <input type="file" name="file" id="fileInput" accept="image/png,image/jpeg" multiple>
+                <div class="drop-label">
+                    <span>Click to select</span>, drag &amp; drop, or <span>Ctrl+V</span> to paste
+                </div>
+            </div>
+            <p class="paste-hint" id="pasteHint">Paste an image from the clipboard (Ctrl+V / Cmd+V) anywhere on this page.</p>
+            <p class="paste-hint" id="formatHint">Accepted formats: PNG, JPEG.</p>
+            <form action="{{ urlPath (print "/api/" .Project "/elements/upload") }}" method="post" enctype="multipart/form-data" id="uploadForm" style="display:none;">
+                <input type="file" name="file" id="hiddenFileInput" accept="image/png,image/jpeg">
+            </form>
+            <div id="uploadProgress" style="display:none;color:#53d8fb;font-size:0.85rem;margin-top:0.5rem;">Uploading...</div>
+        </div>
+
+        <!-- Uploaded Images Grid -->
+        <div class="card">
+            <div class="gallery-controls">
+                <div>
+                    <span style="color:#a0a0b0;font-size:0.85rem;">
+                        {{ len .Gallery }} of {{ .Total }} uploaded images
+                    </span>
+                </div>
+                <div class="gallery-controls-right">
+                    <a href="{{ urlPath (print "/basic/" .Project) }}" class="btn btn-secondary">← Dashboard</a>
+                </div>
+            </div>
+
+            {{ if .Gallery }}
+            <div class="gallery-grid">
+                {{ range .Gallery }}
+                <div class="gallery-item">
+                    <a href="{{ urlPath (print "/basic/" $.Project "/element/" .ID) }}">
+                        {{ if .Image }}
+                        <img src="{{ urlPath (print "/basic/" $.Project "/element/" .ID "/image") }}" alt="{{ if .Generation }}{{ .Generation.Prompt }}{{ else }}{{ .ID }}{{ end }}" loading="lazy">
+                        {{ else }}
+                        <div class="placeholder" style="width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:#0d1b36;color:#a0a0b0;font-size:0.8rem;border-top:1px solid #0f3460;border-radius:0 0 8px 0">Image missing</div>
+                        {{ end }}
+                    </a>
+                    <div class="meta">{{ .Origin }}</div>
+                </div>
+                {{ end }}
+            </div>
+            {{ else }}
+            <div class="empty-state">
+                <p>No uploaded images yet.</p>
+                <p style="margin-top:0.5rem;">Upload your first image above — click, drop, or paste.</p>
+            </div>
+            {{ end }}
+        </div>
+
+        {{ if gt .TotalPages 1 }}
+        <div class="pagination">
+            {{ if gt .PageNum 1 }}
+            <a href="?page={{ .PrevPage }}">← Prev</a>
+            {{ end }}
+            <span class="current">{{ .PageNum }} / {{ .TotalPages }}</span>
+            {{ if lt .PageNum .TotalPages }}
+            <a href="?page={{ .NextPage }}">Next →</a>
+            {{ end }}
+        </div>
+        {{ end }}
+    </div>
+
+    <script>
+    (function() {
+        var project = '{{ .Project }}';
+        var prefix = '{{ .prefix }}';
+        var dropZone = document.getElementById('dropZone');
+        var fileInput = document.getElementById('fileInput');
+        var hiddenInput = document.getElementById('hiddenFileInput');
+        var uploadForm = document.getElementById('uploadForm');
+        var progress = document.getElementById('uploadProgress');
+        var pasteHint = document.getElementById('pasteHint');
+
+        // --- Drag & Drop ---
+        if (dropZone) {
+            ['dragenter', 'dragover'].forEach(function(evt) {
+                dropZone.addEventListener(evt, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.add('drag-over');
+                });
+            });
+            ['dragleave', 'drop'].forEach(function(evt) {
+                dropZone.addEventListener(evt, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.remove('drag-over');
+                });
+            });
+            dropZone.addEventListener('drop', function(e) {
+                var files = e.dataTransfer.files;
+                if (files.length > 0) handleFiles(files);
+            });
+        }
+
+        // --- File input change ---
+        if (fileInput) {
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files.length > 0) handleFiles(fileInput.files);
+            });
+        }
+
+        // --- Paste ---
+        document.addEventListener('paste', function(e) {
+            var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    var file = items[i].getAsFile();
+                    if (file) handleFiles([file]);
+                    return;
+                }
+            }
+        });
+
+        // --- Upload handler ---
+        function handleFiles(files) {
+            var file = files[0];
+            // Hide paste hint after first interaction
+            if (pasteHint) pasteHint.style.display = 'none';
+            // Set file in hidden form input
+            if (hiddenInput) {
+                var dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                hiddenInput.files = dataTransfer.files;
+            }
+            // Submit via XHR
+            if (!uploadForm) return;
+            var formData = new FormData(uploadForm);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', uploadForm.action, true);
+            xhr.setRequestHeader('Accept', 'application/json');
+            if (progress) progress.style.display = 'block';
+            xhr.onload = function() {
+                if (progress) progress.style.display = 'none';
+                if (xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    window.location.href = prefix + '/basic/' + project + '/element/' + data.element_id;
+                } else {
+                    alert('Upload failed: ' + xhr.responseText);
+                }
+            };
+            xhr.onerror = function() {
+                if (progress) progress.style.display = 'none';
+                alert('Upload failed');
+            };
+            xhr.send(formData);
+        }
+    })();
+    </script>
+</body>
+</html>
